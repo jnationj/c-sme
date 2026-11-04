@@ -11,7 +11,9 @@
     "dev": "tsx --env-file-if-exists=.env src/index.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "wallet:new": "node scripts/generate-wallet.mjs"
+    "wallet:new": "node scripts/generate-wallet.mjs",
+    "wallet:buyer": "node scripts/generate-buyer.mjs",
+    "pay:test": "tsx --env-file=.env.buyer scripts/pay-test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.4.0",
