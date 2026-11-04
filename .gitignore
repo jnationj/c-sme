@@ -1,0 +1,21 @@
+# secrets: never commit
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# runtime state
+node_modules/
+data/
+*.sqlite
+*.sqlite-journal
+.buy/
+dist/
+coverage/
+
+# local agent/IDE settings and working chat logs
+.claude/settings.local.json
+co-pilot.txt
+claude.txt
+lastresponseChatgpt.md

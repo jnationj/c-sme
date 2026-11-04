@@ -1,0 +1,34 @@
+{
+  "name": "c-sme",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "CorridorPilot: an agent that researches for Nigerian SMEs, pays for data over x402 (buy), and gets paid in USA₮ on Celo.",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "tsx --env-file-if-exists=.env src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "wallet:new": "node scripts/generate-wallet.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.4.0",
+    "@celo/attribution-tags": "^0.5.0",
+    "@celo/buy": "^0.8.5",
+    "@hono/node-server": "^2.1.6",
+    "@x402/core": "^2.29.0",
+    "@x402/evm": "^2.29.0",
+    "@x402/fetch": "^2.29.0",
+    "@x402/hono": "^2.29.0",
+    "hono": "^4.13.16",
+    "viem": "^2.57.16"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}
