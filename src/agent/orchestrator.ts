@@ -11,6 +11,8 @@ export interface Plan {
   question: string;
   steps: PlanStep[];
   totalAtomic: bigint;
+  /** What the customer pays us: data cost plus our fee. */
+  customerAtomic: bigint;
   status: "proposed" | "running" | "done";
   /** Results bought in an earlier stage of the same question (stage 2 reports use them too). */
   prior?: StepResult[];
@@ -22,11 +24,20 @@ export interface OrchestratorOpts {
   token: string;
   account: string;
   sandbox: boolean;
+  feeAtomic: bigint;
 }
 
 export class Orchestrator {
   private plans = new Map<string, Plan>();
   constructor(private o: OrchestratorOpts) {}
+
+  getPlan(id: string): Plan | undefined {
+    return this.plans.get(id);
+  }
+
+  get feeAtomic(): bigint {
+    return this.o.feeAtomic;
+  }
 
   async propose(question: string): Promise<Plan> {
     const steps = await planSteps(question);
@@ -35,8 +46,10 @@ export class Orchestrator {
       question,
       steps,
       totalAtomic: steps.reduce((a, s) => a + s.quoteAtomic, 0n),
+      customerAtomic: 0n,
       status: "proposed",
     };
+    plan.customerAtomic = steps.length ? plan.totalAtomic + this.o.feeAtomic : 0n;
     this.plans.set(plan.id, plan);
     this.o.ledger.record(
       "plan_proposed",
@@ -127,14 +140,15 @@ export class Orchestrator {
       ? await writeReport(plan.question, allResults)
       : { text: "No data was bought, so there is no report. See the payment log.", by: "fallback" as const };
     ledger.record("report_written", { by: report.by, steps: results.length }, plan.id);
-    let followUp: { id: string; totalUsd: string; steps: Array<{ provider: string; why: string; usd: string }> } | undefined;
+    let followUp: { id: string; totalUsd: string; customerUsd: string; steps: Array<{ provider: string; why: string; usd: string }> } | undefined;
     if (!plan.prior && results.length) {
       const fs = await followUpSteps(bought);
       if (fs.length) {
-        const child: Plan = { id: randomUUID(), question: plan.question, steps: fs, totalAtomic: fs.reduce((a, s) => a + s.quoteAtomic, 0n), status: "proposed", prior: allResults };
+        const child: Plan = { id: randomUUID(), question: plan.question, steps: fs, totalAtomic: fs.reduce((a, s) => a + s.quoteAtomic, 0n), customerAtomic: 0n, status: "proposed", prior: allResults };
+        child.customerAtomic = child.totalAtomic + this.o.feeAtomic;
         this.plans.set(child.id, child);
         ledger.record("followup_proposed", { parent: plan.id, steps: fs.length }, child.id);
-        followUp = { id: child.id, totalUsd: formatUsd(child.totalAtomic), steps: fs.map((s) => ({ provider: s.provider, why: s.why, usd: formatUsd(s.quoteAtomic) })) };
+        followUp = { id: child.id, totalUsd: formatUsd(child.totalAtomic), customerUsd: formatUsd(child.customerAtomic), steps: fs.map((s) => ({ provider: s.provider, why: s.why, usd: formatUsd(s.quoteAtomic) })) };
       }
     }
     return { planId: plan.id, report, payments: log, spentUsd: formatUsd(ledger.spentForTask(plan.id)), followUp };

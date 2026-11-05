@@ -8,12 +8,13 @@
     "node": ">=22.13"
   },
   "scripts": {
-    "dev": "tsx --env-file-if-exists=.env src/index.ts",
+    "dev": "node scripts/build-web.mjs && tsx --env-file-if-exists=.env src/index.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "wallet:new": "node scripts/generate-wallet.mjs",
     "wallet:buyer": "node scripts/generate-buyer.mjs",
-    "pay:test": "tsx --env-file=.env.buyer scripts/pay-test.ts"
+    "pay:test": "tsx --env-file=.env.buyer scripts/pay-test.ts",
+    "build:web": "node scripts/build-web.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.4.0",
@@ -29,6 +30,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
+    "esbuild": "^0.28.2",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"
