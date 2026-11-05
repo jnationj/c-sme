@@ -14,7 +14,8 @@
     "wallet:new": "node scripts/generate-wallet.mjs",
     "wallet:buyer": "node scripts/generate-buyer.mjs",
     "pay:test": "tsx --env-file=.env.buyer scripts/pay-test.ts",
-    "build:web": "node scripts/build-web.mjs"
+    "build:web": "node scripts/build-web.mjs",
+    "register:8004": "tsx --env-file=.env scripts/register-8004.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.4.0",
