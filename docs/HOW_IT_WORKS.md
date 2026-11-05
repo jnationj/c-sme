@@ -51,6 +51,20 @@ An honest comparison.
 
 **What we do not claim.** We are not smarter than a chatbot, not conversational, and we do not remember you. Our value is narrow: current platform data, bought on demand, with receipts and a price you agree to first. If that is not what you need, a chatbot is the better tool. We would rather say that than oversell.
 
+## Why not do this by hand?
+
+You can, and for a one-off question it is free. This is what we know about the free options (not re-checked against each platform's current rules, so verify before relying on it):
+
+| Free option | What it gives you | Limits |
+|---|---|---|
+| TikTok Creative Center (public website) | Trending hashtags, top-performing ads, top creators, with region filters | Fixed views only, no custom questions. Check whether your country is listed. |
+| TikTok and Instagram search, hashtag and Explore pages | The actual posts with their likes and views | You scroll and note things yourself. Instagram needs a login and shows only a slice. |
+| Your own account's Insights (professional accounts) | Your own audience and post performance | Your own data only, never a competitor's |
+
+**What costs you time by hand:** reading dozens of posts, counting which hooks repeat, comparing several accounts, and keeping track of where each claim came from. **What cPilot adds:** it does the reading and counting in about a minute, cites every claim to a purchased source, and tells you what the data cannot answer.
+
+**What it does not add:** access to anything you could not see yourself in the apps. If you have a free hour and want to learn the platform, doing it by hand is a good way to start. cPilot is for people who would rather have the answer and the receipts.
+
 ## Where the money goes
 - **Customer pays** data cost + $0.02 service fee (USA₮ on Celo mainnet, USDC on the Sepolia test network), through Celo's x402 facilitator. The fee covers report writing, hosting and payment settlement.
 - **The agent pays providers** per call from its own wallet over x402 for services in the buy catalog.

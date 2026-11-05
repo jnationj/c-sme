@@ -83,6 +83,7 @@ describe("pages and config", () => {
     expect(html).toMatch(/third-party providers/i);
     expect(html).toMatch(/not from TikTok or Instagram directly/i);
     expect(html).toMatch(/have not verified how those providers collect/i);
+    expect(html).toMatch(/by hand for free/i);
   });
 
   it("serves the static assets and a health check", async () => {

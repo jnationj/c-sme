@@ -44,6 +44,8 @@ An agent that buys the market data a small seller or creator needs, shows every 
 
 **Demand created for the services consumed.** [Replace with real numbers on submission day: paid calls bought, distinct providers, calls per customer report (3 to 5), customers who came back.] Each paid report buys 3 to 5 calls, so customer usage translates directly into new paid calls on these services. We do not claim volume we do not have.
 
+**Why not do it by hand.** Everything we read is something a person could look at in the apps for free. What we add is the time saved: reading and counting dozens of posts, citing each claim to a purchased source, and stating what the data cannot answer. We say so plainly in the product.
+
 **Why this instead of a general chatbot.** A chatbot answers from training data or the web pages it can open. We buy current TikTok and Instagram data per question from paid providers, show each price first, charge only if the report is delivered, and attach on-chain receipts to every report. We do not claim to be smarter or conversational. Full comparison: docs/HOW_IT_WORKS.md.
 
 **Reliability and honesty.** Provider errors are recorded as "failed, not charged" and never counted as delivered. If no data can be bought, the customer is not charged. The report states what the data cannot answer: for example, Instagram usually does not expose prices ("DM for price"), and TikTok trend data is US-weighted.
