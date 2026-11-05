@@ -1,52 +1,69 @@
 # Submission draft (nothing here is submitted; the owner approves every word)
 
-Rules for this text: only claims that are true on the day of submission. Items in [BRACKETS] must be replaced with real evidence or deleted. No invented users, volumes or transactions.
+Rules for this text: only claims that are true on the day of submission. Items in [BRACKETS] must be replaced with real evidence or deleted. No invented users, volumes or transactions. Screenshots in `docs/screenshots` are Celo Sepolia test mode and must never be presented as mainnet.
+
+## Strategy (decided 2026-11-05)
+1. **Primary track: Build with buy** (5 winners of $200). Judges look for: a named user and a real problem (40%), depth of paid-service integration measured by verified paid calls from the agent wallet (35%), and demand created for the services consumed (25%). The organisers said: "state what services you are using and proof of payments in your submission. No attribution tag needed." (Telegram #3310)
+2. **Secondary: Open Corridors, USA₮ with x402.** Only enter it with honest evidence of who paid. Scored on settlement through Celo's facilitator, a named outside counterparty, repeat flow, and why USA₮ fits.
+3. Not entering Textile FX or LatAm.
 
 ## Fields
 
 | Field | Value |
 |---|---|
 | Project name | CorridorPilot |
-| Repo | https://github.com/jnationj/c-sme |
-| Demo URL | [Railway URL, after deploy] |
+| Repo | https://github.com/jnationj/c-sme (public; a fresh clone installs, builds and passes 34 tests) |
+| Demo URL | [Railway URL after deploy] |
 | Agent wallet | 0x8c3c14616972cC3B06d4E378D5e11a682fC49e35 (already saved on the Loops entry) |
-| Screenshots | [see "Screenshot plan" below] |
+| Screenshots | docs/screenshots (re-take on mainnet after the first real run) |
 | Video | optional |
 
 ## Tagline
-An agent that does paid market research for Instagram and TikTok sellers: it shows the exact price first and pays only after you approve.
+An agent that buys the market data a small seller or creator needs, shows every price first, and pays only after you approve.
 
-## Description (draft)
+## Description (draft, written to the Build with buy criteria)
 
-**Who it is for.** Small online sellers and creators in Nigeria who sell and grow on Instagram and TikTok, for example a clothing seller in Lagos and an AI-content creator. [Blessing, clothing seller: gave permission to use her name. Jesam, AI-content creator: confirm permission before naming.] Today they guess what to post and what competitors do, or spend hours scrolling.
+**Who it is for.** Small online sellers and creators in Nigeria who grow on Instagram and TikTok: [Blessing, an Instagram clothing seller (gave permission to use her name)] and [Jesam, an AI-content creator on Instagram and TikTok (confirm permission before naming)]. Today they guess what to post and what competitors do, or spend hours scrolling.
 
-**What it does.** The owner asks a question, such as "what hooks and formats work for small AI-focused TikTok accounts?". The agent finds paid data sources in the live buy catalog, shows each exact price and the total, and waits. After the customer approves and pays from their own wallet, the agent buys the data over x402 on Celo and writes a short report that also states what the data cannot answer. If no data can be bought, the customer is not charged.
+**What it costs them now and what changed.** [Fill from real conversations: how long they spend today, what they pay, what the report replaced. Do not estimate.] The agent turns a plain-language question into a short report in about a minute, for cents.
 
-**How money moves.**
-1. The customer pays our agent wallet (data cost plus a $0.02 service fee) in USA₮ through Celo's x402 facilitator. The payment is a gasless signature, so the customer needs no CELO.
-2. The agent pays each data provider per call over x402 from the same agent wallet, under hard limits: per call, per task and per day caps, allowlists for providers and tokens, a kill switch, no spending while an earlier payment is uncertain, and no duplicate payments.
-3. Every payment is written to an audit ledger. Each report has a shareable receipt with the transaction links.
+**How it uses paid services (the core of the product).** Every report is built from paid x402 calls to services we do not own, bought through the buy catalog (gateway.usebuy.ai) with our agent wallet. The agent chooses sources from the live catalog, shows each exact price, waits for approval, then pays per call on Celo mainnet. A policy engine, not the AI, authorises every payment (per-call, per-task and daily caps, provider and token allowlists, duplicate-payment protection, a kill switch, and a hold while any payment is uncertain).
 
-**Autonomy and guardrails.** A language model plans explanations and writes the report, but a deterministic policy engine, not the model, decides every payment. The agent never spends without a matching approval. Failed provider calls are recorded as not charged and never counted as delivered.
+**Services consumed (with proof of payments).** Fill the transaction column from the ledger after the mainnet runs. Do not list a service we have not paid for.
 
-**Celo stack used.** x402 via Celo's facilitator (customer payments and provider payments), USA₮ for settlement on mainnet, ERC-8004 agent identity [registered: agentId N, tx hash], ERC-8021 attribution tag `celo_d0da34839ac6` on directly sent transactions, and the buy catalog as the data marketplace.
+| Service (buy catalog id) | Provider | Price | Used for | Mainnet proof |
+|---|---|---|---|---|
+| tiktok ads get-trends-hashtag-list | TikHub | $0.005 | trending hashtags | [tx hashes] |
+| tiktok ads get-top-contents-list | TikHub | $0.005 | top-performing content | [tx hashes] |
+| tiktok scraper (apidojo) | Apify | $0.009 per 10 results | recent videos for a keyword | [tx hashes] |
+| instagram v1 fetch-search | TikHub | $0.005 | accounts matching a query | [tx hashes] |
+| instagram v1 fetch-user-posts | TikHub | $0.005 | follow-up: recent posts of found accounts | [tx hashes] |
+| instagram v2 fetch-hashtag-posts | TikHub | $0.007 | top posts for a hashtag (intermittent provider errors; failures are not charged) | [tx hashes] |
 
-**Honest status.** [Replace with facts on submission day: how many real customer payments settled on mainnet, from how many distinct wallets, how many repeat. If none are independent, say so plainly.] Known limits: Instagram data usually does not include prices ("DM for price"), so the agent says so and reports engagement and activity instead; some provider calls fail and are not charged; TikTok trend data is US-weighted.
+**Demand created for the services consumed.** [Replace with real numbers on submission day: paid calls bought, distinct providers, calls per customer report (3 to 5), customers who came back.] Each paid report buys 3 to 5 calls, so customer usage translates directly into new paid calls on these services. We do not claim volume we do not have.
 
-## Tracks to enter (owner confirms after the organisers reply)
-- Build with buy: the project consumes paid x402 services it does not own.
-- Open Corridors, USA₮ with x402: customers settle in USA₮ through Celo's facilitator.
-- Not entering Textile FX [unless Textile responds and we build it] and not entering LatAm.
+**Reliability and honesty.** Provider errors are recorded as "failed, not charged" and never counted as delivered. If no data can be bought, the customer is not charged. The report states what the data cannot answer: for example, Instagram usually does not expose prices ("DM for price"), and TikTok trend data is US-weighted.
 
-## Screenshot plan (real captures only)
-1. Plan screen: sources, prices, data + fee, "You pay".
-2. Report screen with the payment table.
-3. Receipt page with transaction links.
-4. Customer activity and ledger.
-5. Loops page showing the agent wallet, tag seen and ERC-8004 identity.
-Capture the mainnet badge ("Celo mainnet (real money)") once real runs exist, and the Sepolia badge for staging shots. Never present Sepolia activity as mainnet.
+**Celo stack used.** x402 via Celo's facilitator for customer payments (USA₮ on mainnet), x402 payments to buy-catalog services, ERC-8004 identity [registered: agentId N, tx hash], ERC-8021 attribution tag `celo_d0da34839ac6` on directly sent transactions (the facilitator does not tag x402 settlements yet, per the organisers; we declare our builder code in every 402 so tagging starts automatically when it ships).
+
+**Honest status.** [Replace on submission day with facts: how many real customer payments settled on mainnet, from how many distinct wallets, how many repeat. If the pilot customers' wallets are new, say so plainly.]
+
+## Open Corridors, USA₮ with x402 (secondary; enter only with evidence)
+- Customers pay us in USA₮ through Celo's x402 facilitator, with a gasless signature. Receipts and the ledger show each settlement with its transaction link.
+- Why USA₮ fits this user: a US-regulated dollar with stable pricing for sellers in a volatile-currency market, and gasless payment means no CELO needed.
+- Named counterparties and repeat flow: [only list people who actually paid, with permission, and how many times].
 
 ## Evidence to collect before submitting (goes in EVIDENCE.md)
-- Mainnet transaction hashes: first tagged transaction, ERC-8004 registration, each customer payment, each provider payment.
-- Customer names only with permission, and what each said.
-- The organisers' written answers to the scoring questions.
+- Mainnet transaction hashes: ERC-8004 registration, first tagged transaction, each provider purchase, each customer payment.
+- For each customer named: their words, date, permission, and each payment.
+- The organisers' written answers (Telegram links) to any scoring question we relied on.
+
+## Pre-submit checklist
+- [ ] Agent wallet funded (USA₮ and CELO), mainnet smoke test passed
+- [ ] ERC-8004 registered from the agent wallet; `AGENT_ID` set; Loops "identity" check green
+- [ ] Tagged transaction visible; Loops "tag seen" check green
+- [ ] Railway demo live on mainnet, `/health` ok, receipt page works
+- [ ] At least one real customer run with transaction links in the Live proof panel
+- [ ] Screenshots re-taken in mainnet mode
+- [ ] README and this description match reality line by line
+- [ ] Repo public and linked in the Loops submission (the AskBots review needs it)
