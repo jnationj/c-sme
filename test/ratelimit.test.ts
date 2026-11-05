@@ -24,8 +24,9 @@ describe("RateLimiter", () => {
 
 describe("clientIp", () => {
   const h = (m: Record<string, string>) => (n: string) => m[n];
-  it("uses the first X-Forwarded-For entry", () => {
-    expect(clientIp(h({ "x-forwarded-for": "1.2.3.4, 10.0.0.1" }))).toBe("1.2.3.4");
+  it("uses the LAST X-Forwarded-For entry (added by our proxy), ignoring forged earlier ones", () => {
+    expect(clientIp(h({ "x-forwarded-for": "6.6.6.6, 1.2.3.4" }))).toBe("1.2.3.4");
+    expect(clientIp(h({ "x-forwarded-for": "1.2.3.4" }))).toBe("1.2.3.4");
   });
   it("falls back to X-Real-IP, then a shared bucket", () => {
     expect(clientIp(h({ "x-real-ip": "5.6.7.8" }))).toBe("5.6.7.8");

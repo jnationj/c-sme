@@ -23,8 +23,12 @@ export class RateLimiter {
   }
 }
 
-/** The caller's address behind a proxy: the first entry of X-Forwarded-For, else X-Real-IP, else a shared bucket. */
+/**
+ * The caller's address behind a proxy. We take the LAST X-Forwarded-For entry: that is the one our own proxy appended,
+ * while earlier entries can be forged by the visitor to dodge the limit. Falls back to X-Real-IP, then a shared bucket.
+ */
 export function clientIp(h: (name: string) => string | undefined): string {
-  const xff = h("x-forwarded-for")?.split(",")[0]?.trim();
+  const parts = h("x-forwarded-for")?.split(",").map((x) => x.trim()).filter(Boolean);
+  const xff = parts?.[parts.length - 1];
   return xff || h("x-real-ip")?.trim() || "unknown";
 }
