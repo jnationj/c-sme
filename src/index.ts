@@ -7,6 +7,7 @@ import { Orchestrator, policyFromEnv } from "./agent/orchestrator.js";
 import { parseUsd } from "./chain/tokens.js";
 import { directCall } from "./agent/payDirect.js";
 import { createApp } from "./app.js";
+import { normalizePrivateKey } from "./chain/key.js";
 
 const testnet = (process.env.X402_NETWORK ?? "testnet") !== "mainnet";
 const tokenInfo = sellerToken(testnet);
@@ -28,7 +29,8 @@ const agent = new Orchestrator({
 // PAY_BACKEND=direct pays providers with the x402 library (no OS keychain needed, works on a cloud host).
 // Default is the buy CLI. The signing key comes from PAY_PRIVATE_KEY, else AGENT_PRIVATE_KEY (never logged).
 const payBackend = process.env.PAY_BACKEND ?? "buy";
-const payKey = (process.env.PAY_PRIVATE_KEY ?? process.env.AGENT_PRIVATE_KEY) as `0x${string}` | undefined;
+const payKeyVar = process.env.PAY_PRIVATE_KEY ? "PAY_PRIVATE_KEY" : "AGENT_PRIVATE_KEY";
+const payKey = normalizePrivateKey(process.env[payKeyVar], payKeyVar); // tolerates a missing 0x prefix; fails clearly on anything else
 if (payBackend === "direct" && !payKey) throw new Error("PAY_BACKEND=direct needs PAY_PRIVATE_KEY or AGENT_PRIVATE_KEY");
 agent.setPayer(
   payBackend === "direct"
