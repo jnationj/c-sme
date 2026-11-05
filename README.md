@@ -2,7 +2,7 @@
 
 Market research for **Nigerian online sellers and creators** on Instagram and TikTok. They ask a question (for example, what Lagos fashion sellers post that gets engagement, or which hooks work for small AI creators). The agent finds paid data sources in the live [buy](https://usebuy.ai) catalog, shows every exact price, waits for approval, pays over x402 on Celo, and returns a short report that also says what the data cannot answer. The customer pays data cost plus a small fee in USA₮ through the Celo x402 facilitator, and only if the report is delivered.
 
-How it works, and an honest comparison with general chatbots: [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md).
+**Where the data comes from:** third-party providers (TikHub and Apify) sold through the buy catalog, not TikTok's or Instagram's own APIs. We have not verified how those providers collect their data. Details and an honest comparison with general chatbots: [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md).
 
 Built for the Agents on Open Rails hackathon (Celo mainnet only for scored activity).
 

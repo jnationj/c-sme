@@ -29,6 +29,8 @@ An agent that buys the market data a small seller or creator needs, shows every 
 
 **How it uses paid services (the core of the product).** Every report is built from paid x402 calls to services we do not own, bought through the buy catalog (gateway.usebuy.ai) with our agent wallet. The agent chooses sources from the live catalog, shows each exact price, waits for approval, then pays per call on Celo mainnet. A policy engine, not the AI, authorises every payment (per-call, per-task and daily caps, provider and token allowlists, duplicate-payment protection, a kill switch, and a hold while any payment is uncertain).
 
+**Data sourcing disclosure.** The data comes from third-party providers (TikHub and Apify) sold through the buy catalog. It is not from TikTok's or Instagram's own APIs, we use no customer account or login, and we have not verified how the providers collect it. We say "data about public content from third-party providers" and nothing stronger.
+
 **Services consumed (with proof of payments).** Fill the transaction column from the ledger after the mainnet runs. Do not list a service we have not paid for.
 
 | Service (buy catalog id) | Provider | Price | Used for | Mainnet proof |

@@ -77,6 +77,14 @@ describe("pages and config", () => {
     expect(html).not.toContain("__PUBLIC_URL__");
   });
 
+  it("describes the data source honestly: third-party providers, never an official API", async () => {
+    const html = await (await make().app.request("/")).text();
+    expect(html).not.toMatch(/(TikTok|Instagram) API/i);
+    expect(html).toMatch(/third-party providers/i);
+    expect(html).toMatch(/not from TikTok or Instagram directly/i);
+    expect(html).toMatch(/have not verified how those providers collect/i);
+  });
+
   it("serves the static assets and a health check", async () => {
     const { app } = make();
     for (const p of ["/app.js", "/styles.css", "/og.png", "/health"]) expect((await app.request(p)).status, p).toBe(200);

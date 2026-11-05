@@ -15,6 +15,13 @@ cPilot answers one kind of question: **"what is working on Instagram or TikTok f
 
 If a data source fails, the failed call is recorded as "failed, not charged" and the run continues with the rest. A report is only delivered if at least one purchase settled.
 
+## Where the data comes from (read this before relying on a report)
+
+- **Sources:** third-party data providers, mainly **TikHub** and **Apify**, sold through the buy catalog (`gateway.usebuy.ai`). We pay them per call over x402.
+- **Not official APIs.** The data does not come from TikTok's or Instagram's own APIs, and we do not use any customer's TikTok or Instagram login or account.
+- **We have not verified how these providers collect their data.** Providers like these may gather public pages, which can raise questions under each platform's terms. We cannot vouch for their methods, so we describe the result only as "data about public content from third-party providers".
+- **What we do with it:** read patterns (counts, medians, top posts) and cite each one. We keep the raw response of each purchase on our server so a report can be re-checked. Reports may quote public posts and account names that appear in the data.
+
 ## What the agent can and cannot see
 
 | It can | It cannot |
@@ -35,7 +42,7 @@ An honest comparison.
 
 | | General chatbot | cPilot |
 |---|---|---|
-| Where facts come from | Training data, or web pages it can open | Data bought per question from paid TikTok and Instagram data providers |
+| Where facts come from | Training data, or web pages it can open | Data about public TikTok and Instagram content, bought per question from third-party providers |
 | Evidence | Usually none you can check | Each report lists every data call with its on-chain transaction |
 | Cost | Monthly subscription | A few cents per question, price shown first |
 | Pays only on success | No | Yes: your payment settles only after the report is delivered |
