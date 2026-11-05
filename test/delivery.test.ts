@@ -94,3 +94,48 @@ describe("Ledger reports and customer stats", () => {
     expect(stats.find((x) => x.payer === b)!.runs).toBe(1);
   });
 });
+
+import { RunGate, isTxHash, parsePositiveInt } from "../src/agent/delivery.js";
+
+describe("RunGate (Copilot review: concurrent runs must not bypass the unsettled cap)", () => {
+  it("lets at most max concurrent runs in, even when requests arrive together", () => {
+    const g = new RunGate(3);
+    const results = Array.from({ length: 6 }, () => g.tryEnter(0));
+    expect(results.filter(Boolean)).toHaveLength(3);
+    expect(g.inFlight).toBe(3);
+  });
+  it("counts already-unsettled customer payments against the same limit", () => {
+    const g = new RunGate(3);
+    expect(g.tryEnter(2)).toBe(true); // 2 unsettled + 0 in flight < 3
+    expect(g.tryEnter(2)).toBe(false); // 2 unsettled + 1 in flight = 3
+  });
+  it("frees a slot when a run leaves, and never goes negative", () => {
+    const g = new RunGate(1);
+    expect(g.tryEnter(0)).toBe(true);
+    expect(g.tryEnter(0)).toBe(false);
+    g.leave();
+    g.leave();
+    expect(g.inFlight).toBe(0);
+    expect(g.tryEnter(0)).toBe(true);
+  });
+});
+
+describe("isTxHash", () => {
+  it("accepts only a 32-byte 0x hash", () => {
+    expect(isTxHash("0x" + "a".repeat(64))).toBe(true);
+    expect(isTxHash("0x123")).toBe(false);
+    expect(isTxHash(undefined)).toBe(false);
+    expect(isTxHash("a".repeat(66))).toBe(false);
+  });
+});
+
+describe("parsePositiveInt", () => {
+  it("uses the fallback when unset", () => {
+    expect(parsePositiveInt("X", undefined, 3)).toBe(3);
+    expect(parsePositiveInt("X", "", 3)).toBe(3);
+  });
+  it("parses valid values and rejects typos instead of silently disabling a limit", () => {
+    expect(parsePositiveInt("X", "5", 3)).toBe(5);
+    for (const bad of ["bad", "0", "-1", "2.5", "NaN"]) expect(() => parsePositiveInt("X", bad, 3)).toThrow();
+  });
+});

@@ -6,7 +6,7 @@ import { Ledger } from "./ledger/ledger.js";
 import { Orchestrator, policyFromEnv } from "./agent/orchestrator.js";
 import { formatUsd, parseUsd } from "./chain/tokens.js";
 import { PAGE } from "./web/page.js";
-import { decodeSettlement, hasDeliverable } from "./agent/delivery.js";
+import { RunGate, decodeSettlement, hasDeliverable, isTxHash, parsePositiveInt } from "./agent/delivery.js";
 import { renderReceipt } from "./web/receipt.js";
 import { directCall } from "./agent/payDirect.js";
 
@@ -182,26 +182,32 @@ if (payTo) {
   // x402 settles only after the handler succeeds, so a failed run is not charged.
   // Outermost layer for /api/run/*: guards the plan, stops serving if customer settlements keep failing,
   // and after the x402 middleware has settled (or failed to) reconciles the ledger from the settlement result.
-  const maxUnsettled = Number(process.env.MAX_UNSETTLED_RUNS ?? 3);
+  const gate = new RunGate(parsePositiveInt("MAX_UNSETTLED_RUNS", process.env.MAX_UNSETTLED_RUNS, 3));
   app.use("/api/run/*", async (c, next) => {
     const id = c.req.path.split("/").pop() ?? "";
     const p = agent.getPlan(id);
     if (!p || p.status !== "proposed" || !p.steps.length) return c.json({ error: "unknown or already used plan" }, 404);
     // Bounded exposure: each run spends provider money before the customer's payment settles, so stop
     // accepting new runs once too many earlier customer payments failed or are still unconfirmed.
-    if (ledger.countIncoming("failed") + ledger.countIncoming("submitted", 5 * 60_000) >= maxUnsettled) {
+    // The slot is reserved here, before any provider spend, and released only after reconciliation.
+    if (!gate.tryEnter(ledger.countIncoming("failed") + ledger.countIncoming("submitted", 5 * 60_000))) {
       return c.json({ error: "temporarily unavailable, please try again later" }, 503);
     }
-    await next();
-    const key = `in:${id}`;
-    if (ledger.keyUsed(key)) {
-      const s = decodeSettlement(c.res.headers.get("payment-response") ?? c.res.headers.get("x-payment-response"));
-      if (s?.success) {
-        ledger.setStatus(key, "settled", s.transaction);
-      } else {
-        ledger.setStatus(key, "failed");
-        ledger.record("customer_settlement_failed", { status: c.res.status, plan: id }, id);
+    try {
+      await next();
+      const key = `in:${id}`;
+      if (ledger.keyUsed(key)) {
+        const s = decodeSettlement(c.res.headers.get("payment-response") ?? c.res.headers.get("x-payment-response"));
+        if (s?.success && isTxHash(s.transaction)) {
+          ledger.setStatus(key, "settled", s.transaction);
+        } else {
+          // Includes "success but no verifiable transaction hash": not trusted as settled.
+          ledger.setStatus(key, "failed");
+          ledger.record("customer_settlement_failed", { status: c.res.status, plan: id, hadSuccessFlag: s?.success === true }, id);
+        }
       }
+    } finally {
+      gate.leave();
     }
   });
   app.use(

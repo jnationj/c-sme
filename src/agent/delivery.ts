@@ -29,3 +29,34 @@ export function decodeSettlement(header: string | null | undefined): Settlement 
     return undefined;
   }
 }
+
+export const isTxHash = (h: unknown): h is string => typeof h === "string" && /^0x[0-9a-fA-F]{64}$/.test(h);
+
+/** Parse a positive-integer env value. A typo must stop startup, not silently disable a safety limit. */
+export function parsePositiveInt(name: string, raw: string | undefined, fallback: number): number {
+  if (raw === undefined || raw === "") return fallback;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1) throw new Error(`${name} must be a positive integer, got "${raw}"`);
+  return n;
+}
+
+/**
+ * Bounds how many customer payments can be unsettled at once, INCLUDING runs still in flight.
+ * Node runs this synchronously, so tryEnter() cannot interleave: concurrent requests cannot all pass the check.
+ */
+export class RunGate {
+  private inFlightCount = 0;
+  constructor(readonly max: number) {}
+  /** unsettled = customer payments already known to be failed or overdue-unconfirmed. */
+  tryEnter(unsettled: number): boolean {
+    if (unsettled + this.inFlightCount >= this.max) return false;
+    this.inFlightCount += 1;
+    return true;
+  }
+  leave(): void {
+    this.inFlightCount = Math.max(0, this.inFlightCount - 1);
+  }
+  get inFlight(): number {
+    return this.inFlightCount;
+  }
+}
