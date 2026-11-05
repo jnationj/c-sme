@@ -35,9 +35,9 @@ An agent that buys the market data a small seller or creator needs, shows every 
 
 | Service (buy catalog id) | Provider | Price | Used for | Mainnet proof |
 |---|---|---|---|---|
-| tiktok ads get-trends-hashtag-list | TikHub | $0.005 | trending hashtags | [tx hashes] |
-| tiktok ads get-top-contents-list | TikHub | $0.005 | top-performing content | [tx hashes] |
-| tiktok scraper (apidojo) | Apify | $0.009 per 10 results | recent videos for a keyword | [tx hashes] |
+| tiktok ads get-trends-hashtag-list | TikHub | $0.005 | trending hashtags | [0xdb81736b…](https://celoscan.io/tx/0xdb81736b3be1215c6f0eb531d1412d51f950fc4dcacb38d0b523f387f2fd1d39) (operator smoke test) |
+| tiktok ads get-top-contents-list | TikHub | $0.005 | top-performing content | [0x11994aa3…](https://celoscan.io/tx/0x11994aa3cb9a4e75215624ff770b15461cc1759fbd077c149b367cfd9dcec463) (operator smoke test) |
+| tiktok scraper (apidojo) | Apify | $0.009 per 10 results | recent videos for a keyword | [0x16450a6f…](https://celoscan.io/tx/0x16450a6f8440abc70c23cd69107824c5b2eb0c34252a97dc3f70bc7b9963046b) (operator smoke test) |
 | instagram v1 fetch-search | TikHub | $0.005 | accounts matching a query | [tx hashes] |
 | instagram v1 fetch-user-posts | TikHub | $0.005 | follow-up: recent posts of found accounts | [tx hashes] |
 | instagram v2 fetch-hashtag-posts | TikHub | $0.007 | top posts for a hashtag (intermittent provider errors; failures are not charged) | [tx hashes] |
@@ -50,7 +50,7 @@ An agent that buys the market data a small seller or creator needs, shows every 
 
 **Reliability and honesty.** Provider errors are recorded as "failed, not charged" and never counted as delivered. If no data can be bought, the customer is not charged. The report states what the data cannot answer: for example, Instagram usually does not expose prices ("DM for price"), and TikTok trend data is US-weighted.
 
-**Celo stack used.** x402 via Celo's facilitator for customer payments (USA₮ on mainnet), x402 payments to buy-catalog services, ERC-8004 identity [registered: agentId N, tx hash], ERC-8021 attribution tag `celo_d0da34839ac6` on directly sent transactions (the facilitator does not tag x402 settlements yet, per the organisers; we declare our builder code in every 402 so tagging starts automatically when it ships).
+**Celo stack used.** x402 via Celo's facilitator for customer payments (USA₮ on mainnet), x402 payments to buy-catalog services, ERC-8004 identity (agent #10040, [registration tx](https://celoscan.io/tx/0xaef63794f8280a66822cbe42c9ef0237e24cfde1b9f6f5e237e4d9340405076c)), ERC-8021 attribution tag `celo_d0da34839ac6` on directly sent transactions (the facilitator does not tag x402 settlements yet, per the organisers; we declare our builder code in every 402 so tagging starts automatically when it ships).
 
 **Honest status.** [Replace on submission day with facts: how many real customer payments settled on mainnet, from how many distinct wallets, how many repeat. If the pilot customers' wallets are new, say so plainly.]
 
