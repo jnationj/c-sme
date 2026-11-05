@@ -2,11 +2,14 @@ import { HTTPFacilitatorClient } from "@x402/core/http";
 import { x402ResourceServer } from "@x402/core/server";
 import { ExactEvmScheme } from "@x402/evm/exact/server";
 import { paymentMiddleware } from "@x402/hono";
+import { BUILDER_CODE, builderCodeResourceServerExtension, declareBuilderCodeExtension } from "@x402/extensions";
 import { TOKENS, SEPOLIA_USDC, type Token } from "../chain/tokens.js";
 
 export type SellerConfig = {
   testnet: boolean;
   payTo: string; // wallet that receives the money (and is the address submitted to Loops)
+  /** Our Loops builder code (ERC-8021 app code). Declared in every 402 response; the facilitator tags settlements with it once its update ships. */
+  builderCode?: string;
   apiKey?: string; // facilitator /settle key, server-side only
 };
 
@@ -33,6 +36,7 @@ export function createPaywall(cfg: SellerConfig, route: string, priceFor: PriceF
     createAuthHeaders: async () => ({ verify: {}, supported: {}, ...(auth ? { settle: auth } : {}) }),
   });
   const server = new x402ResourceServer(facilitator).register(NETWORK[key], new ExactEvmScheme());
+  if (cfg.builderCode) server.registerExtension(builderCodeResourceServerExtension);
   return paymentMiddleware(
     {
       [route]: {
@@ -53,6 +57,8 @@ export function createPaywall(cfg: SellerConfig, route: string, priceFor: PriceF
         },
         description,
         mimeType: "application/json",
+        // Harmless today (organisers confirmed untagged settlements are credited by payTo). Takes effect when the facilitator ships tagging; v2 only.
+        ...(cfg.builderCode ? { extensions: { [BUILDER_CODE]: declareBuilderCodeExtension(cfg.builderCode) } } : {}),
       },
     },
     server,
