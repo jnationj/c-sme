@@ -7,6 +7,8 @@ export interface Capability {
   available: boolean;
   provider?: string;
   price?: { usd: string; atomic: string };
+  /** All price tiers, e.g. one per maxResults value. */
+  tiers: Array<{ maxResults?: number; atomic: string }>;
 }
 
 const CATALOG_URL = "https://gateway.usebuy.ai/v1/catalog";
@@ -30,6 +32,7 @@ export async function getCatalog(): Promise<Map<string, Capability>> {
       available: !!c.available,
       provider: c.id.split(".")[2] ?? c.agent?.provider,
       price: p?.atomic ? { usd: p.usd, atomic: p.atomic } : undefined,
+      tiers: (c.priceOptions ?? []).filter((o: any) => o.atomic).map((o: any) => ({ maxResults: o.maxResults, atomic: o.atomic })),
     });
   }
   cache = { at: Date.now(), caps };

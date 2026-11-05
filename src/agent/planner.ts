@@ -32,13 +32,12 @@ export async function planSteps(question: string, maxSteps = 5): Promise<PlanSte
   const wantInsta = /instagram|\big\b|sell|price|charge|vendor|shop|cloth|fashion|ankara|boutique/.test(q);
   const both = !wantTikTok && !wantInsta;
 
-  const candidates: Array<{ id: string; body: unknown; why: string }> = [];
+  const candidates: Array<{ id: string; body: unknown; why: string; maxResults?: number }> = [];
   if (wantTikTok || both) {
     candidates.push(
       { id: "monid.tiktok.tikhub.api-v1-tiktok-ads-get-trends-hashtag-list", body: { body: { country_code: "US", time_range: 7, limit: 10 }, queryParams: {} }, why: "Hashtags trending on TikTok this week" },
-      { id: "monid.tiktok.tikhub.api-v1-tiktok-ads-get-top-contents-list", body: { body: { country_code: "US", period_dimension: 3, period_end_timestamp: Math.floor(Date.now() / 86_400_000) * 86_400, limit: 10 }, queryParams: {} }, why: "Top-performing TikTok content right now" },
-      { id: "monid.tiktok.tikhub.api-v1-tiktok-web-fetch-search-live", body: { queryParams: { keyword: phrase, count: 10 } }, why: `TikTok posts matching "${phrase}"` },
-      { id: "monid.tiktok.tikhub.api-v1-tiktok-web-fetch-search-user", body: { queryParams: { keyword: phrase } }, why: `TikTok creators matching "${phrase}"` },
+      { id: "monid.tiktok.tikhub.api-v1-tiktok-ads-get-top-contents-list", body: { body: { country_code: "US", period_dimension: 3, period_end_timestamp: Math.floor(Date.now() / 86_400_000) * 86_400 - 3 * 86_400, limit: 10 }, queryParams: {} }, why: "Top-performing TikTok content right now" },
+      { id: "monid.tiktok.apify.apidojo-tiktok-scraper", body: { body: { keywords: [phrase], dateRange: "THIS_WEEK" }, maxResults: 10 }, maxResults: 10, why: `Recent TikTok videos matching "${phrase}"` },
     );
   }
   if (wantInsta || both) {
@@ -52,7 +51,9 @@ export async function planSteps(question: string, maxSteps = 5): Promise<PlanSte
   for (const c of candidates) {
     const cap = caps.get(c.id);
     if (!cap || !cap.available || !cap.price) continue; // only buy what is live and priced
-    steps.push({ capabilityId: cap.id, title: cap.title, provider: cap.provider ?? "unknown", url: cap.url, body: c.body, quoteAtomic: BigInt(cap.price.atomic), why: c.why });
+    const tier = c.maxResults ? cap.tiers.find((t) => t.maxResults === c.maxResults) : undefined;
+    if (c.maxResults && !tier) continue; // requested result size is not offered
+    steps.push({ capabilityId: cap.id, title: cap.title, provider: cap.provider ?? "unknown", url: cap.url, body: c.body, quoteAtomic: BigInt(tier?.atomic ?? cap.price.atomic), why: c.why });
     if (steps.length >= maxSteps) break;
   }
   return steps;
