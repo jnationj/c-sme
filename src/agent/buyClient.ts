@@ -21,8 +21,8 @@ export class BuyError extends Error {
 const SAFE_FAIL_CODES = ["unexpected_response", "invalid_request", "insufficient_funds"];
 
 /** Pays one catalog call via the buy CLI (x402). Spawns the CLI without a shell, so the body is never shell-parsed. */
-export function buyCall(opts: { url: string; body: unknown; account: string; sandbox: boolean; timeoutMs?: number }): Promise<BuyResult> {
-  const args = [buyBin, ...(opts.sandbox ? ["-s"] : []), "--account", opts.account, "curl", "-sS", "-X", "POST", opts.url, "-H", "content-type: application/json", "-d", JSON.stringify(opts.body)];
+export function buyCall(opts: { url: string; body: unknown; account: string; sandbox: boolean; token: string; maxAmount: string; timeoutMs?: number }): Promise<BuyResult> {
+  const args = [buyBin, ...(opts.sandbox ? ["-s"] : []), "--account", opts.account, "curl", "--token", opts.token, "--max-amount", opts.maxAmount, "-sS", "-X", "POST", opts.url, "-H", "content-type: application/json", "-d", JSON.stringify(opts.body)];
   return new Promise((resolve, reject) => {
     execFile(process.execPath, args, { timeout: opts.timeoutMs ?? 120_000, maxBuffer: 20_000_000 }, (err, stdout, stderr) => {
       if (err) {

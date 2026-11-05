@@ -57,7 +57,9 @@ $('approve').onclick=async()=>{if(!plan)return;$('approve').disabled=true;$('app
  try{const d=await j('/api/approve',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({planId:plan.id})});
   $('rep').textContent=d.report.text;$('by').textContent='written by '+d.report.by+' - spent $'+d.spentUsd;
   $('payTbl').innerHTML='<tr><th>Call</th><th>USD</th><th>Status</th></tr>'+d.payments.map(p=>'<tr><td>'+esc(p.title)+'</td><td>'+esc(p.usd)+'</td><td class="'+cls(p.status)+'">'+esc(p.status)+(p.note?' - '+esc(p.note):'')+'</td></tr>').join('');
-  $('repBox').hidden=false;$('planBox').hidden=true;plan=null}catch(e){alert(e.message)}
+  $('repBox').hidden=false;$('planBox').hidden=true;plan=null;
+  if(d.followUp){plan=d.followUp;$('planTbl').innerHTML='<tr><th>Source</th><th>Why</th><th>Price</th></tr>'+plan.steps.map(s=>'<tr><td>'+esc(s.provider)+'</td><td>'+esc(s.why)+'</td><td>$'+esc(s.usd)+'</td></tr>').join('');$('total').textContent='$'+plan.totalUsd;$('planNote').textContent='Follow-up for more detail - '+plan.steps.length+' more paid calls';$('approve').disabled=false;$('planBox').hidden=false}
+ }catch(e){alert(e.message)}
  $('approve').textContent='Approve and pay';$('approve').disabled=false;ledger()};
 ledger();
 </script></main></body></html>`;

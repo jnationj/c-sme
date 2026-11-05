@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Ledger, startOfUtcDay } from "../ledger/ledger.js";
 import { evaluateSpend, type PolicyConfig } from "../policy/engine.js";
 import { formatUsd, parseUsd } from "../chain/tokens.js";
-import { planSteps, type PlanStep } from "./planner.js";
+import { followUpSteps, planSteps, type PlanStep } from "./planner.js";
 import { buyCall, BuyError } from "./buyClient.js";
 import { writeReport, type StepResult } from "./report.js";
 
@@ -12,6 +12,8 @@ export interface Plan {
   steps: PlanStep[];
   totalAtomic: bigint;
   status: "proposed" | "running" | "done";
+  /** Results bought in an earlier stage of the same question (stage 2 reports use them too). */
+  prior?: StepResult[];
 }
 
 export interface OrchestratorOpts {
@@ -55,6 +57,7 @@ export class Orchestrator {
     ledger.record("plan_approved", { totalUsd: formatUsd(plan.totalAtomic) }, plan.id);
 
     const results: StepResult[] = [];
+    const bought: StepResult[] = [];
     const log: Array<{ title: string; usd: string; status: string; tx: string | null; note?: string }> = [];
     for (const [i, s] of plan.steps.entries()) {
       const key = `${plan.id}:${i}`;
@@ -91,12 +94,13 @@ export class Orchestrator {
       });
       ledger.setStatus(key, "submitted");
       try {
-        const r = await buyCall({ url: s.url, body: s.body, account: this.o.account, sandbox: this.o.sandbox });
+        const r = await buyCall({ url: s.url, body: s.body, account: this.o.account, sandbox: this.o.sandbox, token, maxAmount: formatUsd(s.quoteAtomic) });
         ledger.setStatus(key, "settled", r.transaction ?? undefined);
         if (r.paidAtomic && BigInt(r.paidAtomic) > s.quoteAtomic) {
           ledger.record("price_above_quote", { quoted: s.quoteAtomic.toString(), paid: r.paidAtomic }, plan.id);
         }
         results.push({ title: s.title, why: s.why, output: r.output });
+        bought.push({ title: s.title, why: s.why, output: r.output });
         log.push({
           title: s.title,
           usd: formatUsd(r.paidAtomic ? BigInt(r.paidAtomic) : s.quoteAtomic),
@@ -118,11 +122,22 @@ export class Orchestrator {
       }
     }
     plan.status = "done";
+    const allResults = [...(plan.prior ?? []), ...results];
     const report = results.length
-      ? await writeReport(plan.question, results)
+      ? await writeReport(plan.question, allResults)
       : { text: "No data was bought, so there is no report. See the payment log.", by: "fallback" as const };
     ledger.record("report_written", { by: report.by, steps: results.length }, plan.id);
-    return { planId: plan.id, report, payments: log, spentUsd: formatUsd(ledger.spentForTask(plan.id)) };
+    let followUp: { id: string; totalUsd: string; steps: Array<{ provider: string; why: string; usd: string }> } | undefined;
+    if (!plan.prior && results.length) {
+      const fs = await followUpSteps(bought);
+      if (fs.length) {
+        const child: Plan = { id: randomUUID(), question: plan.question, steps: fs, totalAtomic: fs.reduce((a, s) => a + s.quoteAtomic, 0n), status: "proposed", prior: allResults };
+        this.plans.set(child.id, child);
+        ledger.record("followup_proposed", { parent: plan.id, steps: fs.length }, child.id);
+        followUp = { id: child.id, totalUsd: formatUsd(child.totalAtomic), steps: fs.map((s) => ({ provider: s.provider, why: s.why, usd: formatUsd(s.quoteAtomic) })) };
+      }
+    }
+    return { planId: plan.id, report, payments: log, spentUsd: formatUsd(ledger.spentForTask(plan.id)), followUp };
   }
 }
 

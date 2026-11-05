@@ -58,3 +58,23 @@ export async function planSteps(question: string, maxSteps = 5): Promise<PlanSte
   }
   return steps;
 }
+
+/**
+ * Stage 2: after an Instagram account search, fetch recent posts of the first few public accounts
+ * so captions (which usually carry prices) can be read. Needs its own approval.
+ */
+export async function followUpSteps(prior: Array<{ title: string; output: unknown }>, maxAccounts = 3): Promise<PlanStep[]> {
+  const caps = await getCatalog();
+  const cap = caps.get("monid.instagram.tikhub.api-v1-instagram-v1-fetch-user-posts");
+  if (!cap || !cap.available || !cap.price) return [];
+  const search = prior.find((r) => /instagram.*search/i.test(r.title));
+  const users = ((search?.output as any)?.users ?? []) as Array<{ user?: { pk_id?: string; id?: string; username?: string; is_private?: boolean } }>;
+  const steps: PlanStep[] = [];
+  for (const u of users) {
+    const id = u.user?.pk_id ?? u.user?.id;
+    if (!id || u.user?.is_private) continue;
+    steps.push({ capabilityId: cap.id, title: cap.title, provider: cap.provider ?? "unknown", url: cap.url, body: { queryParams: { user_id: String(id), count: 8 } }, quoteAtomic: BigInt(cap.price.atomic), why: `Recent posts from @${u.user?.username ?? id} (captions often show prices)` });
+    if (steps.length >= maxAccounts) break;
+  }
+  return steps;
+}
