@@ -154,7 +154,7 @@
       $("sRepeat").textContent = p.repeatCustomers;
       var note = $("proofNote");
       if (p.paidReports === 0) {
-        note.textContent = (p.providerPurchases ? p.providerPurchases + " data purchases so far were made by the agent" + (cfg.testnet ? " in test mode" : "") + ". " : "") + "No customer has paid for a report yet.";
+        note.textContent = (p.providerPurchases ? p.providerPurchases + " data purchases so far were made by the agent" + (cfg.testnet ? " in test mode" : "") + ". " : "") + "No customer has paid for a report yet." + (p.teamTestReports ? " " + p.teamTestReports + " test report" + (p.teamTestReports === 1 ? " was" : "s were") + " paid by the team's own wallets, which are not counted as customers." : "");
       } else {
         note.textContent = p.paidReports + " report" + (p.paidReports === 1 ? "" : "s") + " paid by " + p.customers + " customer" + (p.customers === 1 ? "" : "s") + (cfg.testnet ? " (test mode)" : "") + ".";
       }

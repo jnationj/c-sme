@@ -109,9 +109,18 @@ export function createApp(d: AppDeps): Hono {
     });
   });
 
+  // Wallets that belong to the team (the agent's own pay-to wallet plus any listed in TEAM_WALLETS) are tests, not customers.
+  // They are shown separately so the public numbers never overstate real customer use.
+  const team = new Set(
+    [env.SELLER_PAY_TO, ...(env.TEAM_WALLETS ?? "").split(",")].map((x) => x?.trim().toLowerCase()).filter((x): x is string => !!x),
+  );
+  const isTeam = (payer: string) => team.has(payer.toLowerCase());
+
   // Public proof: real counts from the ledger, no questions or full wallet addresses.
   app.get("/api/proof", (c) => {
-    const customers = ledger.customerStats();
+    const all = ledger.customerStats();
+    const customers = all.filter((x) => !isTeam(x.payer));
+    const teamTestReports = all.filter((x) => isTeam(x.payer)).reduce((a, x) => a + x.runs, 0);
     const paidUsd = customers.reduce((a, x) => a + x.paidAtomic, 0n);
     const n = (sql: string) => (ledger.db.prepare(sql).get() as { n: number }).n;
     const providerPurchases = n("SELECT COUNT(*) AS n FROM payments WHERE direction = 'out' AND status = 'settled'");
@@ -124,7 +133,8 @@ export function createApp(d: AppDeps): Hono {
       at: r.created_at,
     }));
     return c.json({
-      paidReports: n("SELECT COUNT(*) AS n FROM reports WHERE payer IS NOT NULL"),
+      paidReports: customers.reduce((a, x) => a + x.runs, 0),
+      teamTestReports,
       customers: customers.length,
       repeatCustomers: customers.filter((x) => x.runs > 1).length,
       customerPaidUsd: formatUsd(paidUsd),
@@ -217,7 +227,7 @@ export function createApp(d: AppDeps): Hono {
   // Anonymous usage stats for the operator: counts and totals per (shortened) customer wallet, no questions.
   app.get("/api/customers", (c) =>
     c.json(
-      ledger.customerStats().map((x) => ({
+      ledger.customerStats().filter((x) => !isTeam(x.payer)).map((x) => ({
         customer: x.payer.slice(0, 6) + "…" + x.payer.slice(-4),
         runs: x.runs,
         paidUsd: formatUsd(x.paidAtomic),

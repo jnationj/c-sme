@@ -214,6 +214,26 @@ describe("a full run (operator test-funds path)", () => {
   });
 });
 
+describe("public proof never counts the team's own wallets as customers", () => {
+  const TEAM = "0x8c3c14616972cc3b06d4e378d5e11a682fc49e35";
+  const OTHER = "0x1111111111111111111111111111111111111111";
+  const rep = (id: string, payer: string) => ({ planId: id, question: "q", report: "r", writtenBy: "fallback", payments: [], dataAtomic: 19000n, customerAtomic: 39000n, payer });
+
+  it("separates team test payments from real customers", async () => {
+    const { app, ledger } = make({ env: { SELLER_PAY_TO: TEAM, TEAM_WALLETS: "0x7216D0BC422C6ea3954E167D483879Ff26EBbfCc" } });
+    ledger.saveReport(rep("a", TEAM));
+    ledger.saveReport(rep("b", "0x7216d0bc422c6ea3954e167d483879ff26ebbfcc"));
+    let proof = await json(await app.request("/api/proof"));
+    expect(proof).toMatchObject({ paidReports: 0, customers: 0, teamTestReports: 2 });
+    expect(await json(await app.request("/api/customers"))).toEqual([]);
+    ledger.saveReport(rep("c", OTHER));
+    ledger.saveReport(rep("d", OTHER));
+    proof = await json(await app.request("/api/proof"));
+    expect(proof).toMatchObject({ paidReports: 2, customers: 1, repeatCustomers: 1, teamTestReports: 2 });
+    expect((await json(await app.request("/api/customers")))).toHaveLength(1);
+  });
+});
+
 describe("mainnet lock and paid route", () => {
   it("never lets an anonymous visitor spend the agent's money on mainnet", async () => {
     const { app } = make({ testnet: false, adminToken: "secret-token" });
