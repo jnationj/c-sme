@@ -16,6 +16,9 @@ export interface Plan {
   status: "proposed" | "running" | "done";
   /** Results bought in an earlier stage of the same question (stage 2 reports use them too). */
   prior?: StepResult[];
+  /** What the run is doing right now, for the live progress view. */
+  stage: "queued" | "buying" | "writing" | "done";
+  progress: Array<{ state: "pending" | "paying" | "settled" | "failed" | "blocked" | "uncertain"; tx: string | null }>;
 }
 
 export interface OrchestratorOpts {
@@ -54,6 +57,8 @@ export class Orchestrator {
       totalAtomic: steps.reduce((a, s) => a + s.quoteAtomic, 0n),
       customerAtomic: 0n,
       status: "proposed",
+      stage: "queued",
+      progress: steps.map(() => ({ state: "pending" as const, tx: null })),
     };
     plan.customerAtomic = steps.length ? plan.totalAtomic + this.o.feeAtomic : 0n;
     this.plans.set(plan.id, plan);
@@ -72,6 +77,7 @@ export class Orchestrator {
     if (plan.status !== "proposed") throw new Error(`plan already ${plan.status}`);
     if (!plan.steps.length) throw new Error("plan has no purchasable steps");
     plan.status = "running";
+    plan.stage = "buying";
     const { ledger, policy, token } = this.o;
     ledger.record("plan_approved", { totalUsd: formatUsd(plan.totalAtomic) }, plan.id);
 
@@ -100,6 +106,7 @@ export class Orchestrator {
       if (!decision.allow) {
         ledger.record("spend_blocked", { step: s.capabilityId, reasons: decision.reasons }, plan.id);
         log.push({ title: s.title, usd: formatUsd(s.quoteAtomic), status: "blocked", tx: null, note: decision.reasons.join("; ") });
+        plan.progress[i] = { state: "blocked", tx: null };
         continue;
       }
       ledger.createPayment({
@@ -112,6 +119,7 @@ export class Orchestrator {
         counterparty: s.url,
       });
       ledger.setStatus(key, "submitted");
+      plan.progress[i] = { state: "paying", tx: null };
       try {
         const r = this.o.pay
           ? await this.o.pay({ url: s.url, body: s.body, maxAtomic: s.quoteAtomic })
@@ -120,6 +128,7 @@ export class Orchestrator {
         if (r.paidAtomic && BigInt(r.paidAtomic) > s.quoteAtomic) {
           ledger.record("price_above_quote", { quoted: s.quoteAtomic.toString(), paid: r.paidAtomic }, plan.id);
         }
+        plan.progress[i] = { state: "settled", tx: r.transaction };
         results.push({ title: s.title, why: s.why, output: r.output });
         bought.push({ title: s.title, why: s.why, output: r.output });
         log.push({
@@ -132,6 +141,7 @@ export class Orchestrator {
         const maybe = e instanceof BuyError ? e.paymentMayHaveHappened : true;
         ledger.setStatus(key, maybe ? "uncertain" : "failed");
         ledger.record("step_error", { step: s.capabilityId, error: (e as Error).message }, plan.id);
+        plan.progress[i] = { state: maybe ? "uncertain" : "failed", tx: null };
         log.push({
           title: s.title,
           usd: formatUsd(s.quoteAtomic),
@@ -143,16 +153,18 @@ export class Orchestrator {
       }
     }
     plan.status = "done";
+    plan.stage = "writing";
     const allResults = [...(plan.prior ?? []), ...results];
     const report = results.length
       ? await writeReport(plan.question, allResults)
       : { text: "No data was bought, so there is no report. See the payment log.", by: "fallback" as const };
     ledger.record("report_written", { by: report.by, steps: results.length }, plan.id);
+    plan.stage = "done";
     let followUp: { id: string; totalUsd: string; customerUsd: string; steps: Array<{ provider: string; why: string; usd: string }> } | undefined;
     if (!plan.prior && results.length) {
       const fs = await followUpSteps(bought);
       if (fs.length) {
-        const child: Plan = { id: randomUUID(), question: plan.question, steps: fs, totalAtomic: fs.reduce((a, s) => a + s.quoteAtomic, 0n), customerAtomic: 0n, status: "proposed", prior: allResults };
+        const child: Plan = { id: randomUUID(), question: plan.question, steps: fs, totalAtomic: fs.reduce((a, s) => a + s.quoteAtomic, 0n), customerAtomic: 0n, status: "proposed", prior: allResults, stage: "queued", progress: fs.map(() => ({ state: "pending" as const, tx: null })) };
         child.customerAtomic = child.totalAtomic + this.o.feeAtomic;
         this.plans.set(child.id, child);
         ledger.record("followup_proposed", { parent: plan.id, steps: fs.length }, child.id);

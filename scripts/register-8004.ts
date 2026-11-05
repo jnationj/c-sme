@@ -5,7 +5,8 @@
 //   pnpm register:8004 -- --update <id>     after registering: point the registry at a file that includes the agentId
 //
 // Network follows X402_NETWORK (testnet = Celo Sepolia, mainnet = Celo). Sending on mainnet needs explicit owner approval.
-import { parseEventLogs, formatEther } from "viem";
+import { parseEventLogs, formatEther, encodeFunctionData } from "viem";
+import { fromDataSuffix, toDataSuffix } from "@celo/attribution-tags";
 import { makeClients } from "../src/chain/wallet.js";
 
 const REGISTRY = {
@@ -78,6 +79,16 @@ if (!sim.ok) {
 }
 const gas = await publicClient.estimateContractGas(request as any).catch(() => undefined);
 console.log(`simulation: OK${gas ? ` (gas ~${gas})` : ""}`);
+
+// Offline proof that the transaction will carry our attribution tag: rebuild the calldata with the suffix and decode it.
+{
+  const data = encodeFunctionData({ abi, functionName: updateId !== undefined ? "setAgentURI" : "register", args: (request as { args: readonly unknown[] }).args } as never);
+  const tagged = (data + toDataSuffix(tag).slice(2)) as `0x${string}`;
+  const decoded = fromDataSuffix(tagged);
+  const ok = !!decoded && decoded.codes.includes(tag);
+  console.log(`tag check: calldata ends with the suffix for "${tag}": ${ok ? "YES" : "NO (do not send)"}`);
+  if (!ok) process.exit(1);
+}
 
 if (!send) {
   console.log("\nDRY RUN. Nothing was sent. Re-run with --send (after owner approval) to submit the transaction.");

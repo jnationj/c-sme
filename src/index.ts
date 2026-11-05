@@ -1,11 +1,11 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { createPaywall, sellerToken } from "./seller/x402.js";
 import { Ledger } from "./ledger/ledger.js";
 import { Orchestrator, policyFromEnv } from "./agent/orchestrator.js";
 import { formatUsd, parseUsd } from "./chain/tokens.js";
-import { PAGE } from "./web/page.js";
 import { RunGate, decodeSettlement, hasDeliverable, isTxHash, parsePositiveInt } from "./agent/delivery.js";
 import { renderReceipt } from "./web/receipt.js";
 import { directCall } from "./agent/payDirect.js";
@@ -19,9 +19,10 @@ const adminToken = process.env.ADMIN_TOKEN;
 
 mkdirSync("data", { recursive: true });
 const ledger = new Ledger(process.env.LEDGER_PATH ?? "data/ledger.db");
+const policyCfg = policyFromEnv(token);
 const agent = new Orchestrator({
   ledger,
-  policy: policyFromEnv(token),
+  policy: policyCfg,
   token,
   account: process.env.BUY_ACCOUNT ?? (testnet ? "testbuyer" : "agent"),
   sandbox: testnet,
@@ -40,7 +41,15 @@ agent.setPayer(
 );
 
 const app = new Hono();
-app.get("/", (c) => c.html(PAGE));
+const webDir = fileURLToPath(new URL("./web/", import.meta.url));
+const asset = (file: string, type: string) => (c: import("hono").Context) => {
+  const p = webDir + file;
+  if (!existsSync(p)) return c.text("missing " + file, 404);
+  return c.body(readFileSync(p), 200, { "content-type": type, "cache-control": "no-cache" });
+};
+app.get("/", asset("index.html", "text/html; charset=utf-8"));
+app.get("/app.js", asset("app.js", "text/javascript; charset=utf-8"));
+app.get("/styles.css", asset("styles.css", "text/css; charset=utf-8"));
 app.get("/client.js", (c) => {
   if (!existsSync("web/client.js")) return c.text("client bundle missing: run pnpm build:web", 404);
   return c.body(readFileSync("web/client.js"), 200, { "content-type": "text/javascript; charset=utf-8" });
@@ -55,8 +64,50 @@ app.get("/api/config", (c) =>
     feeUsd: formatUsd(feeAtomic),
     // On testnet anyone may run the agent with its own test funds. On mainnet that needs an admin token.
     freeRunAllowed: testnet,
+    agentWallet: process.env.SELLER_PAY_TO ?? null,
+    builderCode: process.env.ATTRIBUTION_TAG ?? "celo_d0da34839ac6",
+    agentId: process.env.AGENT_ID ?? null, // set after ERC-8004 registration
+    repoUrl: process.env.REPO_URL ?? "https://github.com/jnationj/c-sme",
+    explorer: testnet ? "https://celo-sepolia.blockscout.com" : "https://celoscan.io",
+    limits: { perCallUsd: formatUsd(policyCfg.perCallCap), perTaskUsd: formatUsd(policyCfg.perTaskCap), dailyUsd: formatUsd(policyCfg.dailyCap) },
   }),
 );
+
+// Live progress of a run (the plan id is an unguessable UUID).
+app.get("/api/progress/:planId", (c) => {
+  const p = agent.getPlan(c.req.param("planId"));
+  if (!p) return c.json({ error: "unknown plan" }, 404);
+  return c.json({
+    stage: p.stage,
+    steps: p.steps.map((st, i) => ({ why: st.why, provider: st.provider, usd: formatUsd(st.quoteAtomic), state: p.progress[i]?.state ?? "pending", tx: p.progress[i]?.tx ?? null })),
+  });
+});
+
+// Public proof: real counts from the ledger, no questions or full wallet addresses.
+app.get("/api/proof", (c) => {
+  const customers = ledger.customerStats();
+  const paidUsd = customers.reduce((a, x) => a + x.paidAtomic, 0n);
+  const n = (sql: string) => (ledger.db.prepare(sql).get() as { n: number }).n;
+  const providerPurchases = n("SELECT COUNT(*) AS n FROM payments WHERE direction = 'out' AND status = 'settled'");
+  const dataSpent = (ledger.db.prepare("SELECT amount FROM payments WHERE direction = 'out' AND status = 'settled'").all() as { amount: string }[]).reduce((a, r) => a + BigInt(r.amount), 0n);
+  const recent = (ledger.db.prepare("SELECT direction, provider, amount, status, tx_hash, created_at FROM payments WHERE status = 'settled' AND tx_hash IS NOT NULL ORDER BY created_at DESC LIMIT 8").all() as Array<Record<string, unknown>>).map((r) => ({
+    direction: r.direction,
+    provider: r.provider,
+    usd: formatUsd(BigInt(r.amount as string)),
+    tx: r.tx_hash,
+    at: r.created_at,
+  }));
+  return c.json({
+    paidReports: n("SELECT COUNT(*) AS n FROM reports WHERE payer IS NOT NULL"),
+    customers: customers.length,
+    repeatCustomers: customers.filter((x) => x.runs > 1).length,
+    customerPaidUsd: formatUsd(paidUsd),
+    providerPurchases,
+    onChainPayments: providerPurchases + n("SELECT COUNT(*) AS n FROM payments WHERE direction = 'in' AND status = 'settled'"),
+    dataSpentUsd: formatUsd(dataSpent),
+    recent,
+  });
+});
 
 const describePlan = (p: { id: string; totalAtomic: bigint; customerAtomic: bigint; steps: Array<{ provider: string; why: string; quoteAtomic: bigint }> }) => ({
   id: p.id,
