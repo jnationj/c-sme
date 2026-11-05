@@ -18,7 +18,7 @@ export class BuyError extends Error {
   }
 }
 
-const SAFE_FAIL_CODES = ["unexpected_response", "invalid_request", "insufficient_funds"];
+const SAFE_FAIL_CODES = ["unexpected_response", "invalid_request", "insufficient_funds", "no_account"];
 
 /** Pays one catalog call via the buy CLI (x402). Spawns the CLI without a shell, so the body is never shell-parsed. */
 export function buyCall(opts: { url: string; body: unknown; account: string; sandbox: boolean; token: string; maxAmount: string; timeoutMs?: number }): Promise<BuyResult> {

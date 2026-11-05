@@ -97,6 +97,14 @@ export class Ledger {
     return r !== undefined;
   }
 
+  /** Number of customer (incoming) payments in a status. Used to stop serving when settlements keep failing. */
+  countIncoming(status: PaymentStatus, olderThanMs = 0, now = Date.now()): number {
+    const r = this.db
+      .prepare("SELECT COUNT(*) AS n FROM payments WHERE direction = 'in' AND status = ? AND created_at <= ?")
+      .get(status, now - olderThanMs) as { n: number };
+    return r.n;
+  }
+
   keyUsed(idempotencyKey: string): boolean {
     return this.getPayment(idempotencyKey) !== undefined;
   }
