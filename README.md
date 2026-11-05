@@ -1,4 +1,4 @@
-# c-sme (CorridorPilot)
+# c-sme (cPilot)
 
 Market research for **Nigerian online sellers and creators** on Instagram and TikTok. They ask a question (for example, what Lagos fashion sellers post that gets engagement, or which hooks work for small AI creators). The agent finds paid data sources in the live [buy](https://usebuy.ai) catalog, shows every exact price, waits for approval, pays over x402 on Celo, and returns a short report that also says what the data cannot answer. The customer pays data cost plus a small fee in USA₮ through the Celo x402 facilitator, and only if the report is delivered.
 

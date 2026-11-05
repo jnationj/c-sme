@@ -1,4 +1,4 @@
-# Deploying CorridorPilot (public demo URL)
+# Deploying cPilot (public demo URL)
 
 ## Why not Vercel as-is
 Vercel runs short-lived serverless functions with no persistent disk. This app keeps state in memory (open plans) and in a local SQLite file (ledger, receipts, customer stats), and one paid run takes 20 to 60 seconds. On serverless, plans would vanish between requests and the ledger would reset. Making it work would mean moving state to an external database (a rewrite), which we should not do this close to the deadline.

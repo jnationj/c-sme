@@ -1,4 +1,4 @@
-# CorridorPilot: how it works, how to run it, how to teach it
+# cPilot: how it works, how to run it, how to teach it
 
 Plain-language guide for the project owner. Written so you can explain the product to a customer in five minutes.
 

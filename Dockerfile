@@ -1,4 +1,4 @@
-# CorridorPilot container. Needs Node 24 (built-in node:sqlite).
+# cPilot container. Needs Node 24 (built-in node:sqlite).
 FROM node:24-slim
 ENV NODE_ENV=production
 WORKDIR /app

@@ -1,6 +1,6 @@
-# How CorridorPilot works, and why not just ask a chatbot
+# How cPilot works, and why not just ask a chatbot
 
-CorridorPilot answers one kind of question: **"what is working on Instagram or TikTok for people like me?"** It is built for Nigerian online sellers and creators. It is not a general assistant. This page explains exactly how a report is made, so you can judge it on evidence.
+cPilot answers one kind of question: **"what is working on Instagram or TikTok for people like me?"** It is built for Nigerian online sellers and creators. It is not a general assistant. This page explains exactly how a report is made, so you can judge it on evidence.
 
 ## From question to report, step by step
 
@@ -31,9 +31,9 @@ An honest comparison.
 
 **Where a general chatbot is better.** It holds a conversation, remembers you, writes in your voice, handles any topic, and some can search the web inside the same chat. If you want brainstorming or editing, use one.
 
-**What CorridorPilot does differently.**
+**What cPilot does differently.**
 
-| | General chatbot | CorridorPilot |
+| | General chatbot | cPilot |
 |---|---|---|
 | Where facts come from | Training data, or web pages it can open | Data bought per question from paid TikTok and Instagram data providers |
 | Evidence | Usually none you can check | Each report lists every data call with its on-chain transaction |

@@ -46,7 +46,7 @@ const registry = REGISTRY[net];
 
 const file: Record<string, unknown> = {
   type: "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
-  name: "CorridorPilot",
+  name: "cPilot",
   description:
     "Research agent for small businesses and creators. Finds paid social-data sources, shows exact prices, pays providers over x402 on Celo within spending limits, and returns an honest report. Customers pay in USA₮ via Celo's x402 facilitator.",
   services: [{ name: "web", endpoint: publicUrl ?? "https://example.invalid (set PUBLIC_URL)" }],

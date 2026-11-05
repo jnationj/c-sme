@@ -1,4 +1,4 @@
-/* CorridorPilot front end. Plain JS. All dynamic text goes through textContent (never innerHTML), so
+/* cPilot front end. Plain JS. All dynamic text goes through textContent (never innerHTML), so
    provider data and AI text cannot inject markup. */
 (function () {
   "use strict";

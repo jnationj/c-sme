@@ -1,4 +1,4 @@
-/* CorridorPilot UI. Dark by default, follows the system for light. No external fonts or libraries. */
+/* cPilot UI. Dark by default, follows the system for light. No external fonts or libraries. */
 :root {
   --bg: #070b0a;
   --bg-glow-1: rgba(52, 224, 161, 0.14);

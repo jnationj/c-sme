@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "CorridorPilot: an agent that researches for Nigerian SMEs, pays for data over x402 (buy), and gets paid in USA₮ on Celo.",
+  "description": "cPilot: an agent that researches for Nigerian SMEs, pays for data over x402 (buy), and gets paid in USA₮ on Celo.",
   "engines": {
     "node": ">=22.13"
   },

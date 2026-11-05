@@ -11,7 +11,7 @@ Rules for this text: only claims that are true on the day of submission. Items i
 
 | Field | Value |
 |---|---|
-| Project name | CorridorPilot |
+| Project name | cPilot |
 | Repo | https://github.com/jnationj/c-sme (public; a fresh clone installs, builds and passes 34 tests) |
 | Demo URL | [Railway URL after deploy] |
 | Agent wallet | 0x8c3c14616972cC3B06d4E378D5e11a682fC49e35 (already saved on the Loops entry) |

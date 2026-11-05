@@ -25,7 +25,7 @@ export function renderReceipt(v: ReceiptView): string {
     .join("");
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>CorridorPilot receipt</title>
+<title>cPilot receipt</title>
 <style>
 :root{--bg:#f6f4ef;--card:#fff;--ink:#1c1b19;--mute:#6b675f;--line:#e4e0d6;--acc:#0b6b4f;--warn:#b4570a}
 @media(prefers-color-scheme:dark){:root{--bg:#141412;--card:#1d1c19;--ink:#efece4;--mute:#a09b90;--line:#35322b;--acc:#43c59b;--warn:#e69a4a}}
@@ -36,7 +36,7 @@ main{max-width:760px;margin:0 auto;padding:20px 16px 60px}h1{font-size:1.4rem;ma
 table{width:100%;border-collapse:collapse;font-size:.92rem}td,th{padding:7px 4px;border-bottom:1px solid var(--line);text-align:left}
 pre{white-space:pre-wrap;word-break:break-word;font:inherit;margin:0}.badge{display:inline-block;padding:2px 10px;border-radius:99px;border:1px solid var(--line);font-size:.8rem;color:var(--mute)}
 </style></head><body><main>
-<h1>CorridorPilot receipt</h1>
+<h1>cPilot receipt</h1>
 <p class="mute"><span class="badge">${esc(v.network)}</span> ${esc(new Date(v.createdAt).toUTCString())}</p>
 <div class="card"><strong>Question</strong><p>${esc(v.question)}</p></div>
 <div class="card"><strong>Report</strong> <span class="mute">written by ${esc(v.writtenBy)}</span><pre style="margin-top:8px">${esc(v.report)}</pre></div>

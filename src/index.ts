@@ -299,7 +299,7 @@ if (payTo) {
       { testnet, payTo, apiKey: process.env.X402_API_KEY, builderCode: process.env.ATTRIBUTION_TAG ?? "celo_d0da34839ac6" },
       "POST /api/run/*",
       (path) => agent.getPlan(path.split("/").pop() ?? "")?.customerAtomic,
-      "CorridorPilot research report",
+      "cPilot research report",
     ),
   );
   app.post("/api/run/:planId", async (c) => {
