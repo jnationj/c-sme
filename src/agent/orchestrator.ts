@@ -3,7 +3,7 @@ import { Ledger, startOfUtcDay } from "../ledger/ledger.js";
 import { evaluateSpend, type PolicyConfig } from "../policy/engine.js";
 import { formatUsd, parseUsd } from "../chain/tokens.js";
 import { followUpSteps, planSteps, type PlanStep } from "./planner.js";
-import { buyCall, BuyError } from "./buyClient.js";
+import { buyCall, BuyError, type BuyResult } from "./buyClient.js";
 import { writeReport, type StepResult } from "./report.js";
 
 export interface Plan {
@@ -25,11 +25,17 @@ export interface OrchestratorOpts {
   account: string;
   sandbox: boolean;
   feeAtomic: bigint;
+  /** Optional payer (direct x402). Defaults to the buy CLI. Must enforce the approved max amount itself. */
+  pay?: (a: { url: string; body: unknown; maxAtomic: bigint }) => Promise<BuyResult>;
 }
 
 export class Orchestrator {
   private plans = new Map<string, Plan>();
   constructor(private o: OrchestratorOpts) {}
+
+  setPayer(pay: OrchestratorOpts["pay"]): void {
+    this.o = { ...this.o, pay };
+  }
 
   getPlan(id: string): Plan | undefined {
     return this.plans.get(id);
@@ -107,7 +113,9 @@ export class Orchestrator {
       });
       ledger.setStatus(key, "submitted");
       try {
-        const r = await buyCall({ url: s.url, body: s.body, account: this.o.account, sandbox: this.o.sandbox, token, maxAmount: formatUsd(s.quoteAtomic) });
+        const r = this.o.pay
+          ? await this.o.pay({ url: s.url, body: s.body, maxAtomic: s.quoteAtomic })
+          : await buyCall({ url: s.url, body: s.body, account: this.o.account, sandbox: this.o.sandbox, token, maxAmount: formatUsd(s.quoteAtomic) });
         ledger.setStatus(key, "settled", r.transaction ?? undefined);
         if (r.paidAtomic && BigInt(r.paidAtomic) > s.quoteAtomic) {
           ledger.record("price_above_quote", { quoted: s.quoteAtomic.toString(), paid: r.paidAtomic }, plan.id);

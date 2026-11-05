@@ -8,6 +8,7 @@ import { formatUsd, parseUsd } from "./chain/tokens.js";
 import { PAGE } from "./web/page.js";
 import { decodeSettlement, hasDeliverable } from "./agent/delivery.js";
 import { renderReceipt } from "./web/receipt.js";
+import { directCall } from "./agent/payDirect.js";
 
 const testnet = (process.env.X402_NETWORK ?? "testnet") !== "mainnet";
 const tokenInfo = sellerToken(testnet);
@@ -26,6 +27,17 @@ const agent = new Orchestrator({
   sandbox: testnet,
   feeAtomic,
 });
+
+// PAY_BACKEND=direct pays providers with the x402 library (no OS keychain needed, works on a cloud host).
+// Default is the buy CLI. The signing key comes from PAY_PRIVATE_KEY, else AGENT_PRIVATE_KEY (never logged).
+const payBackend = process.env.PAY_BACKEND ?? "buy";
+const payKey = (process.env.PAY_PRIVATE_KEY ?? process.env.AGENT_PRIVATE_KEY) as `0x${string}` | undefined;
+if (payBackend === "direct" && !payKey) throw new Error("PAY_BACKEND=direct needs PAY_PRIVATE_KEY or AGENT_PRIVATE_KEY");
+agent.setPayer(
+  payBackend === "direct"
+    ? (a) => directCall({ url: a.url, body: a.body, privateKey: payKey!, sandbox: testnet, tokenAddress: tokenInfo.address, maxAtomic: a.maxAtomic })
+    : undefined,
+);
 
 const app = new Hono();
 app.get("/", (c) => c.html(PAGE));
