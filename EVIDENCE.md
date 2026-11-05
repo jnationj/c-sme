@@ -15,8 +15,14 @@ Source: written reply to a direct message from the project owner (pasted into th
 
 Status: has NOT yet paid. Wallet independence (own prior Celo activity, not funded by us) is unconfirmed.
 
-### Blessing: Instagram clothing seller
-Status: contacted; reply not yet recorded here.
+### Blessing: Instagram clothing seller, 2026-11-05
+Source: written reply to a direct message from the project owner (pasted into the project chat).
+- Said she is excited and that it could help her make more money with her business.
+- Gave permission to use her name in the hackathon project.
+- Wants a 10-minute call this week and offered to send 3 real business questions to test.
+- Does NOT currently use a crypto wallet (no MetaMask/Trust Wallet); wants to be shown how to set one up on the call.
+
+Status: has NOT yet paid. She has no existing wallet, so her wallet will be new. That probably does not meet the "own prior Celo activity" independence rule; treat her as qualitative user feedback, not scored settlement evidence, unless the organisers say otherwise.
 
 ## On-chain
 - 2026-11-04: Celo Sepolia x402 test settlement (test buyer -> project wallet, 0.02 USDC): `0x916c7508c402562747e3de7ea7e3ac0e74a2f224041e59427f0ead03d5d6e7a8`. Testnet only, not scored.
