@@ -6,7 +6,7 @@ import type { Ledger } from "./ledger/ledger.js";
 import type { Orchestrator } from "./agent/orchestrator.js";
 import type { PolicyConfig } from "./policy/engine.js";
 import { formatUsd } from "./chain/tokens.js";
-import { RunGate, decodeSettlement, hasDeliverable, isTxHash, parsePositiveInt } from "./agent/delivery.js";
+import { RunGate, decodeSettlement, hasDeliverable, isSelfPayment, isTxHash, parsePositiveInt, payerFromHeader } from "./agent/delivery.js";
 import { RateLimiter, clientIp } from "./agent/ratelimit.js";
 import { renderReceipt } from "./web/receipt.js";
 
@@ -253,17 +253,6 @@ export function createApp(d: AppDeps): Hono {
     });
   });
 
-  /** Best-effort: the payer address is inside the signed payment header the customer sent. */
-  function payerOf(header: string | undefined): string | null {
-    if (!header) return null;
-    try {
-      const j = JSON.parse(Buffer.from(header, "base64").toString("utf8"));
-      return j?.payload?.authorization?.from ?? null;
-    } catch {
-      return null;
-    }
-  }
-
   const payTo = env.SELLER_PAY_TO;
   if (payTo) {
     // Customer pays (data cost + our fee) in USDC on Sepolia / USA₮ on mainnet, then the agent runs.
@@ -275,10 +264,15 @@ export function createApp(d: AppDeps): Hono {
       const id = c.req.path.split("/").pop() ?? "";
       const p = agent.getPlan(id);
       if (!p || p.status !== "proposed" || !p.steps.length) return c.json({ error: "unknown or already used plan" }, 404);
+      // A wallet cannot pay itself: the facilitator refuses it after our agent has already bought data. Refuse up front.
+      if (isSelfPayment(c.req.header("payment-signature") ?? c.req.header("x-payment"), payTo)) {
+        return c.json({ error: "The paying wallet and the receiving wallet are the same address, so this payment cannot settle. Please pay from a different wallet. Nothing was charged." }, 400);
+      }
       // Bounded exposure: each run spends provider money before the customer's payment settles, so stop
       // accepting new runs once too many earlier customer payments failed or are still unconfirmed.
       // The slot is reserved here, before any provider spend, and released only after reconciliation.
-      if (!gate.tryEnter(ledger.countIncoming("failed") + ledger.countIncoming("submitted", 5 * 60_000))) {
+      // Failures are counted over the last hour only, so one bad afternoon cannot lock the service forever.
+      if (!gate.tryEnter(ledger.countIncomingSince("failed", 3_600_000) + ledger.countIncoming("submitted", 5 * 60_000))) {
         return c.json({ error: "temporarily unavailable, please try again later" }, 503);
       }
       try {
@@ -309,7 +303,7 @@ export function createApp(d: AppDeps): Hono {
     app.post("/api/run/:planId", async (c) => {
       const planId = c.req.param("planId");
       const plan = agent.getPlan(planId);
-      const payer = payerOf(c.req.header("payment-signature") ?? c.req.header("x-payment"));
+      const payer = payerFromHeader(c.req.header("payment-signature") ?? c.req.header("x-payment"));
       try {
         const result = await agent.approve(planId);
         // No data bought means no report: answer non-2xx so x402 does not settle (charge) the customer.

@@ -171,6 +171,14 @@ export class Ledger {
     return [...by.values()].sort((a, b) => b.lastAt - a.lastAt);
   }
 
+  /** Customer payments in a status created within the last `windowMs`: a rolling view, so old failures stop counting. */
+  countIncomingSince(status: PaymentStatus, windowMs: number, now = Date.now()): number {
+    const r = this.db
+      .prepare("SELECT COUNT(*) AS n FROM payments WHERE direction = 'in' AND status = ? AND created_at >= ?")
+      .get(status, now - windowMs) as { n: number };
+    return r.n;
+  }
+
   /** Number of customer (incoming) payments in a status. Used to stop serving when settlements keep failing. */
   countIncoming(status: PaymentStatus, olderThanMs = 0, now = Date.now()): number {
     const r = this.db

@@ -95,7 +95,7 @@ describe("Ledger reports and customer stats", () => {
   });
 });
 
-import { RunGate, isTxHash, parsePositiveInt } from "../src/agent/delivery.js";
+import { RunGate, isSelfPayment, isTxHash, parsePositiveInt, payerFromHeader } from "../src/agent/delivery.js";
 
 describe("RunGate (Copilot review: concurrent runs must not bypass the unsettled cap)", () => {
   it("lets at most max concurrent runs in, even when requests arrive together", () => {
@@ -137,5 +137,39 @@ describe("parsePositiveInt", () => {
   it("parses valid values and rejects typos instead of silently disabling a limit", () => {
     expect(parsePositiveInt("X", "5", 3)).toBe(5);
     for (const bad of ["bad", "0", "-1", "2.5", "NaN"]) expect(() => parsePositiveInt("X", bad, 3)).toThrow();
+  });
+});
+
+describe("self-payment guard (the facilitator refuses it only after we have bought data)", () => {
+  const header = (from: string) => Buffer.from(JSON.stringify({ payload: { authorization: { from } } })).toString("base64");
+  const AGENT = "0x8c3c14616972cC3B06d4E378D5e11a682fC49e35";
+  it("reads the payer from a payment header", () => {
+    expect(payerFromHeader(header("0xAbC"))).toBe("0xAbC");
+    expect(payerFromHeader(undefined)).toBeNull();
+    expect(payerFromHeader("garbage")).toBeNull();
+    expect(payerFromHeader(Buffer.from(JSON.stringify({ nope: 1 })).toString("base64"))).toBeNull();
+  });
+  it("flags a payment from the receiving wallet, ignoring letter case", () => {
+    expect(isSelfPayment(header(AGENT.toLowerCase()), AGENT)).toBe(true);
+    expect(isSelfPayment(header(AGENT), AGENT.toLowerCase())).toBe(true);
+  });
+  it("lets any other payer through, and ignores requests without a readable header", () => {
+    expect(isSelfPayment(header("0x1111111111111111111111111111111111111111"), AGENT)).toBe(false);
+    expect(isSelfPayment(undefined, AGENT)).toBe(false);
+    expect(isSelfPayment(header(AGENT), undefined)).toBe(false);
+  });
+});
+
+describe("Ledger.countIncomingSince (the failure breaker must forget old failures)", () => {
+  const row = (key: string) => ({ taskId: "t", direction: "in" as const, provider: "customer", token: "USAT", counterparty: "0x1", idempotencyKey: key, amount: 39000n });
+  it("counts only recent failures", () => {
+    const l = new Ledger();
+    const now = Date.UTC(2026, 10, 6, 12);
+    l.createPayment(row("old"), now - 3 * 3_600_000);
+    l.createPayment(row("recent"), now - 600_000);
+    l.setStatus("old", "failed", undefined, now);
+    l.setStatus("recent", "failed", undefined, now);
+    expect(l.countIncomingSince("failed", 3_600_000, now)).toBe(1);
+    expect(l.countIncomingSince("failed", 4 * 3_600_000, now)).toBe(2);
   });
 });

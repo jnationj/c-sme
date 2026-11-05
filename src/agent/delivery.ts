@@ -30,6 +30,27 @@ export function decodeSettlement(header: string | null | undefined): Settlement 
   }
 }
 
+/** The payer address inside an x402 payment header (base64 JSON). Best effort: null if it cannot be read. */
+export function payerFromHeader(header: string | undefined): string | null {
+  if (!header) return null;
+  try {
+    const j = JSON.parse(Buffer.from(header, "base64").toString("utf8"));
+    const from = j?.payload?.authorization?.from;
+    return typeof from === "string" ? from : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The facilitator refuses a payment whose payer and recipient are the same address, but only AFTER our agent has
+ * already bought data. Detect it from the header so we can refuse before spending anything.
+ */
+export function isSelfPayment(header: string | undefined, payTo: string | undefined): boolean {
+  const payer = payerFromHeader(header);
+  return !!payer && !!payTo && payer.toLowerCase() === payTo.toLowerCase();
+}
+
 export const isTxHash = (h: unknown): h is string => typeof h === "string" && /^0x[0-9a-fA-F]{64}$/.test(h);
 
 /** Parse a positive-integer env value. A typo must stop startup, not silently disable a safety limit. */
