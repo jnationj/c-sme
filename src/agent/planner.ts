@@ -23,7 +23,7 @@ export function keywords(q: string, max = 3): string[] {
  * Deterministic planner: maps a question to a few catalog capabilities with exact bodies.
  * The LLM never chooses what to spend; it only helps explain. Prices come from the live catalog.
  */
-export async function planSteps(question: string, maxSteps = 4): Promise<PlanStep[]> {
+export async function planSteps(question: string, maxSteps = 5): Promise<PlanStep[]> {
   const caps = await getCatalog();
   const q = question.toLowerCase();
   const kw = keywords(question);
@@ -36,6 +36,7 @@ export async function planSteps(question: string, maxSteps = 4): Promise<PlanSte
   if (wantTikTok || both) {
     candidates.push(
       { id: "monid.tiktok.tikhub.api-v1-tiktok-ads-get-trends-hashtag-list", body: { body: { country_code: "US", time_range: 7, limit: 10 }, queryParams: {} }, why: "Hashtags trending on TikTok this week" },
+      { id: "monid.tiktok.tikhub.api-v1-tiktok-ads-get-top-contents-list", body: { body: { country_code: "US", period_dimension: 3, period_end_timestamp: Math.floor(Date.now() / 86_400_000) * 86_400, limit: 10 }, queryParams: {} }, why: "Top-performing TikTok content right now" },
       { id: "monid.tiktok.tikhub.api-v1-tiktok-web-fetch-search-live", body: { queryParams: { keyword: phrase, count: 10 } }, why: `TikTok posts matching "${phrase}"` },
       { id: "monid.tiktok.tikhub.api-v1-tiktok-web-fetch-search-user", body: { queryParams: { keyword: phrase } }, why: `TikTok creators matching "${phrase}"` },
     );

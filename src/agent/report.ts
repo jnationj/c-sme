@@ -39,12 +39,47 @@ function highlights(output: unknown, maxItems = 6): Array<Record<string, unknown
 }
 
 export function facts(results: StepResult[]) {
-  return results.map((r) => ({ source: r.title, why: r.why, items: highlights(r.output) }));
+  return results.map((r) => {
+    const items = highlights(r.output);
+    const readable = items.some((it) => Object.keys(it).length > 0);
+    // When the extractor finds nothing readable, let the LLM read a trimmed raw snippet instead.
+    return { source: r.title, why: r.why, items: readable ? items : [], raw: readable ? undefined : JSON.stringify(r.output).slice(0, 5000) };
+  });
 }
 
 /** Plain-language report. Uses Claude when ANTHROPIC_API_KEY is set; otherwise a deterministic fallback. */
-export async function writeReport(question: string, results: StepResult[]): Promise<{ text: string; by: "claude" | "fallback" }> {
+function prompt(question: string, data: unknown): string {
+  return `You write short, honest research reports for a small business owner in Nigeria. Question: "${question}"
+
+Data bought from paid sources (JSON; may be thin or partly irrelevant):
+${JSON.stringify(data).slice(0, 24000)}
+
+Write 5-8 plain sentences or bullets: what the data shows, one concrete next action, and an explicit note of anything the data does NOT answer. Never invent numbers or creators not present in the data.`;
+}
+
+/** DeepSeek exposes an OpenAI-compatible chat API. Only the question and public social data are sent. */
+async function deepseek(question: string, data: unknown): Promise<string> {
+  const res = await fetch(`${process.env.DEEPSEEK_BASE_URL ?? "https://api.deepseek.com"}/chat/completions`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}` },
+    body: JSON.stringify({ model: process.env.DEEPSEEK_MODEL ?? "deepseek-chat", max_tokens: 900, temperature: 0.3, messages: [{ role: "user", content: prompt(question, data) }] }),
+    signal: AbortSignal.timeout(60_000),
+  });
+  if (!res.ok) throw new Error(`deepseek HTTP ${res.status}`);
+  const j = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+  return (j.choices?.[0]?.message?.content ?? "").trim();
+}
+
+export async function writeReport(question: string, results: StepResult[]): Promise<{ text: string; by: "deepseek" | "claude" | "fallback" }> {
   const data = facts(results);
+  if (process.env.DEEPSEEK_API_KEY) {
+    try {
+      const text = await deepseek(question, data);
+      if (text) return { text, by: "deepseek" };
+    } catch (e) {
+      console.warn("DeepSeek report failed:", (e as Error).message);
+    }
+  }
   if (process.env.ANTHROPIC_API_KEY) {
     try {
       const client = new Anthropic();
@@ -67,9 +102,9 @@ export async function writeReport(question: string, results: StepResult[]): Prom
   const lines = [`Question: ${question}`, ""];
   for (const d of data) {
     lines.push(`• ${d.source} (${d.why})`);
-    if (!d.items.length) lines.push("   - no readable items returned");
+    if (!d.items.length) lines.push(d.raw ? "   - returned data the plain summary cannot read (an AI writer can)" : "   - no items returned");
     for (const it of d.items) lines.push("   - " + Object.entries(it).map(([k, v]) => `${k}: ${v}`).join(" · "));
   }
-  lines.push("", "(Plain data summary. Set ANTHROPIC_API_KEY for a written analysis.)");
+  lines.push("", "(Plain data summary. Set DEEPSEEK_API_KEY (or ANTHROPIC_API_KEY) for a written analysis.)");
   return { text: lines.join("\n"), by: "fallback" };
 }
