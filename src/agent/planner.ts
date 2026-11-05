@@ -11,7 +11,7 @@ export interface PlanStep {
 }
 
 const STOP = new Set(
-  "a an the of and or to in on for with is are was be which what who how that this those these currently right now most best working work looking gaining their they them from by at as it its do does can i me my we our you your accounts account smaller small types type content ideas using use get getting more increase reach niche creators creator strategies strategy contributing tools tool".split(" "),
+  "a an the of and or to in on for with is are was be which what who how that this those these currently right now most best working work looking gaining their they them from by at as it its do does can i me my we our you your accounts account smaller small types type content ideas using use get getting more increase reach niche creators creator strategies strategy contributing regarding views view post posts tiktok instagram video videos sellers seller charging format formats".split(" "),
 );
 
 export function keywords(q: string, max = 3): string[] {
