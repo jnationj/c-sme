@@ -219,15 +219,37 @@ describe("public proof never counts the team's own wallets as customers", () => 
   const OTHER = "0x1111111111111111111111111111111111111111";
   const rep = (id: string, payer: string) => ({ planId: id, question: "q", report: "r", writtenBy: "fallback", payments: [], dataAtomic: 19000n, customerAtomic: 39000n, payer });
 
+  const settle = (ledger: Ledger, id: string, status: "settled" | "failed" = "settled") => {
+    ledger.createPayment({ idempotencyKey: "in:" + id, taskId: id, direction: "in", provider: "customer", token: "USAT", amount: 39000n, counterparty: null });
+    ledger.setStatus("in:" + id, status, status === "settled" ? "0x" + "b".repeat(64) : undefined);
+  };
+
+  it("counts a report as paid only if its customer payment settled", async () => {
+    const { app, ledger } = make({ env: {} });
+    ledger.saveReport(rep("ok", OTHER));
+    settle(ledger, "ok");
+    ledger.saveReport(rep("refused", OTHER)); // report exists, but the payment was refused
+    settle(ledger, "refused", "failed");
+    ledger.saveReport(rep("nopayrow", OTHER)); // no payment row at all
+    const proof = await json(await app.request("/api/proof"));
+    expect(proof).toMatchObject({ paidReports: 1, customers: 1 });
+    const page = await (await app.request("/r/refused")).text();
+    expect(page).toContain("not settled");
+  });
+
   it("separates team test payments from real customers", async () => {
     const { app, ledger } = make({ env: { SELLER_PAY_TO: TEAM, TEAM_WALLETS: "0x7216D0BC422C6ea3954E167D483879Ff26EBbfCc" } });
     ledger.saveReport(rep("a", TEAM));
+    settle(ledger, "a");
     ledger.saveReport(rep("b", "0x7216d0bc422c6ea3954e167d483879ff26ebbfcc"));
+    settle(ledger, "b");
     let proof = await json(await app.request("/api/proof"));
     expect(proof).toMatchObject({ paidReports: 0, customers: 0, teamTestReports: 2 });
     expect(await json(await app.request("/api/customers"))).toEqual([]);
     ledger.saveReport(rep("c", OTHER));
+    settle(ledger, "c");
     ledger.saveReport(rep("d", OTHER));
+    settle(ledger, "d");
     proof = await json(await app.request("/api/proof"));
     expect(proof).toMatchObject({ paidReports: 2, customers: 1, repeatCustomers: 1, teamTestReports: 2 });
     expect((await json(await app.request("/api/customers")))).toHaveLength(1);

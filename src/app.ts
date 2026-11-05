@@ -118,7 +118,7 @@ export function createApp(d: AppDeps): Hono {
 
   // Public proof: real counts from the ledger, no questions or full wallet addresses.
   app.get("/api/proof", (c) => {
-    const all = ledger.customerStats();
+    const all = ledger.customerStats({ settledOnly: true });
     const customers = all.filter((x) => !isTeam(x.payer));
     const teamTestReports = all.filter((x) => isTeam(x.payer)).reduce((a, x) => a + x.runs, 0);
     const paidUsd = customers.reduce((a, x) => a + x.paidAtomic, 0n);
@@ -213,6 +213,7 @@ export function createApp(d: AppDeps): Hono {
       customerUsd: r.customerAtomic === null ? null : formatUsd(r.customerAtomic),
       payer: r.payer,
       customerTx: inRow?.txHash ?? null,
+      customerStatus: inRow?.status ?? null,
       purchases: (r.payments as Array<{ title: string; usd: string; status: string; tx: string | null }>).map((p) => ({ title: p.title, usd: p.usd, status: p.status, tx: p.tx })),
     };
   }
@@ -227,7 +228,7 @@ export function createApp(d: AppDeps): Hono {
   // Anonymous usage stats for the operator: counts and totals per (shortened) customer wallet, no questions.
   app.get("/api/customers", (c) =>
     c.json(
-      ledger.customerStats().filter((x) => !isTeam(x.payer)).map((x) => ({
+      ledger.customerStats({ settledOnly: true }).filter((x) => !isTeam(x.payer)).map((x) => ({
         customer: x.payer.slice(0, 6) + "…" + x.payer.slice(-4),
         runs: x.runs,
         paidUsd: formatUsd(x.paidAtomic),

@@ -156,10 +156,12 @@ export class Ledger {
   }
 
   /** Per-customer usage: how many paid runs and how much, plus first/last activity. Repeat use = runs > 1. */
-  customerStats(): Array<{ payer: string; runs: number; paidAtomic: bigint; firstAt: number; lastAt: number }> {
-    const rows = this.db
-      .prepare("SELECT payer, customer_atomic, created_at FROM reports WHERE payer IS NOT NULL ORDER BY created_at")
-      .all() as Array<{ payer: string; customer_atomic: string | null; created_at: number }>;
+  customerStats(opts: { settledOnly?: boolean } = {}): Array<{ payer: string; runs: number; paidAtomic: bigint; firstAt: number; lastAt: number }> {
+    // settledOnly: a report counts only if its customer payment actually settled (a refused or failed payment is not a paid report).
+    const sql = opts.settledOnly
+      ? "SELECT r.payer AS payer, r.customer_atomic AS customer_atomic, r.created_at AS created_at FROM reports r JOIN payments p ON p.idempotency_key = 'in:' || r.plan_id WHERE r.payer IS NOT NULL AND p.status = 'settled' ORDER BY r.created_at"
+      : "SELECT payer, customer_atomic, created_at FROM reports WHERE payer IS NOT NULL ORDER BY created_at";
+    const rows = this.db.prepare(sql).all() as unknown as Array<{ payer: string; customer_atomic: string | null; created_at: number }>;
     const by = new Map<string, { payer: string; runs: number; paidAtomic: bigint; firstAt: number; lastAt: number }>();
     for (const r of rows) {
       const c = by.get(r.payer) ?? { payer: r.payer, runs: 0, paidAtomic: 0n, firstAt: r.created_at, lastAt: r.created_at };
