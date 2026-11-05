@@ -1,6 +1,8 @@
 # c-sme (CorridorPilot)
 
-An agent for Nigerian small businesses. The owner asks a research question (for example, what competing tailors in Lekki charge). The agent finds the right paid data source in the live [buy](https://usebuy.ai) catalog, shows the exact price, waits for approval, pays over x402 on Celo, and returns a short report. The owner pays for the report in USA₮ through the Celo x402 facilitator.
+Market research for **Nigerian online sellers and creators** on Instagram and TikTok. They ask a question (for example, what Lagos fashion sellers post that gets engagement, or which hooks work for small AI creators). The agent finds paid data sources in the live [buy](https://usebuy.ai) catalog, shows every exact price, waits for approval, pays over x402 on Celo, and returns a short report that also says what the data cannot answer. The customer pays data cost plus a small fee in USA₮ through the Celo x402 facilitator, and only if the report is delivered.
+
+How it works, and an honest comparison with general chatbots: [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md).
 
 Built for the Agents on Open Rails hackathon (Celo mainnet only for scored activity).
 

@@ -41,6 +41,9 @@
     });
   }
 
+  var PROVIDERS = { tikhub: "TikHub", apify: "Apify", mrscraper: "MrScraper" };
+  function pname(p) { return PROVIDERS[String(p).toLowerCase()] || p; }
+
   /* ---------- views and stepper ---------- */
   var VIEWS = { ask: "vAsk", loading: "vLoading", plan: "vPlan", run: "vRun", report: "vReport" };
   var STEP_OF = { ask: 0, loading: 0, plan: 1, run: 2, report: 3 };
@@ -115,7 +118,9 @@
       ? "Test mode: this runs on Celo Sepolia. No real money moves."
       : "Live: payments are real " + cfg.token + " on Celo mainnet.";
     $("free").hidden = !cfg.freeRunAllowed;
-    $("proofNet").textContent = cfg.testnet ? "Sepolia" : "Mainnet";
+    $("proofNet").textContent = cfg.testnet ? "Sepolia test network" : "Celo mainnet";
+    $("chipPay").textContent = "Pay in " + cfg.token + " on Celo";
+    $("docsLink").setAttribute("href", (cfg.repoUrl || "") + "/blob/main/docs/HOW_IT_WORKS.md");
     $("kToken").textContent = cfg.token + " on Celo";
     $("kTag").textContent = cfg.builderCode || "";
     $("kTag").className = "mono";
@@ -143,25 +148,30 @@
   }
   function loadProof() {
     api("/api/proof").then(function (p) {
+      $("sData").textContent = p.providerPurchases;
       $("sReports").textContent = p.paidReports;
       $("sCustomers").textContent = p.customers;
       $("sRepeat").textContent = p.repeatCustomers;
-      $("sChain").textContent = p.onChainPayments;
+      var note = $("proofNote");
+      if (p.paidReports === 0) {
+        note.textContent = (p.providerPurchases ? p.providerPurchases + " data purchases so far were made by the agent" + (cfg.testnet ? " in test mode" : "") + ". " : "") + "No customer has paid for a report yet.";
+      } else {
+        note.textContent = p.paidReports + " report" + (p.paidReports === 1 ? "" : "s") + " paid by " + p.customers + " customer" + (p.customers === 1 ? "" : "s") + (cfg.testnet ? " (test mode)" : "") + ".";
+      }
       var ul = $("recent"); clear(ul);
-      $("recentEmpty").hidden = p.recent.length > 0;
       p.recent.forEach(function (r) {
         var link = el("a", { class: "mono", href: cfg.explorer + "/tx/" + r.tx, target: "_blank", rel: "noopener", text: short(r.tx) });
-        ul.appendChild(el("li", null, el("span", { class: "who", text: (r.direction === "in" ? "Customer paid " : "Paid " + r.provider + " ") + usd(r.usd) }), link));
+        ul.appendChild(el("li", null, el("span", { class: "who", text: (r.direction === "in" ? "Customer paid " : "Agent bought from " + pname(r.provider) + " ") + usd(r.usd) }), link));
       });
     }).catch(function () {});
   }
 
   /* ---------- examples ---------- */
   var EXAMPLES = [
-    "Which AI video tools are trending on TikTok this week?",
-    "What hooks and formats work best for small AI accounts on TikTok?",
+    "What are Lagos fashion sellers posting on Instagram that gets the most engagement?",
+    "What hooks and formats work best for small AI content creators on TikTok?",
     "Who are the most active ankara tops sellers on Instagram in Lagos?",
-    "What content gets the most engagement for fashion sellers on Instagram?"
+    "Which AI video tools are trending on TikTok this week?"
   ];
   function initAsk() {
     var chips = $("chips");
@@ -189,7 +199,7 @@
     $("planNote").textContent = p.steps.length + " paid source" + (p.steps.length === 1 ? "" : "s");
     var ul = $("planList"); clear(ul);
     p.steps.forEach(function (s) {
-      ul.appendChild(el("li", null, el("span", { class: "tag", text: s.provider }), el("span", { text: s.why }), el("span", { class: "price", text: usd(s.usd) })));
+      ul.appendChild(el("li", null, el("span", { class: "tag", text: pname(s.provider) }), el("span", { text: s.why }), el("span", { class: "price", text: usd(s.usd) })));
     });
     $("dataUsd").textContent = usd(p.dataUsd);
     $("feeUsd").textContent = usd(p.feeUsd);
@@ -270,10 +280,10 @@
     lastReport = d.report.text;
     renderMarkdown($("repBody"), d.report.text);
     $("repMeta").textContent = "Written by " + d.report.by + " · data cost " + usd(d.spentUsd);
-    var r = $("rcpt"); r.setAttribute("href", "/r/" + encodeURIComponent(d.planId));
+    var r = $("rcpt"); r.setAttribute("href", "/r/" + encodeURIComponent(d.planId)); r.hidden = !d.receipt;
     var ul = $("repPays"); clear(ul);
     d.payments.forEach(function (p) {
-      var link = p.tx ? el("a", { class: "mono", href: cfg.explorer + "/tx/" + p.tx, target: "_blank", rel: "noopener", text: short(p.tx) }) : el("span", { class: "muted small", text: p.note ? "not charged" : "" });
+      var link = p.tx ? el("a", { class: "mono", href: cfg.explorer + "/tx/" + p.tx, target: "_blank", rel: "noopener", text: short(p.tx) }) : el("span", { class: "muted small", text: p.status === "failed" ? "not charged" : p.status === "uncertain" ? "payment being checked" : "" });
       ul.appendChild(el("li", null, el("span", { text: p.title }), el("span", { class: "st " + p.status, text: usd(p.usd) + " · " + p.status }), link));
     });
     var fc = $("followCard");

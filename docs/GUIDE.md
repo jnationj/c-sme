@@ -9,13 +9,13 @@ A small-business owner or creator asks a research question ("what hooks work for
 ## 2. The money, step by step
 
 ```
-Customer wallet --(1) pays data cost + our fee, gasless signature--> Our agent wallet (x402, USA₮ on mainnet)
+Customer wallet --(1) pays data cost + our fee, signed from their wallet--> Our agent wallet (x402, USA₮ on mainnet)
 Our agent wallet --(2) pays each data provider per call------------> buy gateway / data providers (x402)
 Agent  -----------(3) DeepSeek writes the report from the data-----> Customer
 ```
 
 - **Customer price = data cost + service fee** (fee is `REPORT_FEE_USD`, default $0.02). Example from a real Sepolia test: data $0.019 + fee $0.02 = customer paid $0.039.
-- **Gasless:** the customer only signs. The Celo facilitator submits the transaction. They need USA₮ (mainnet) or test USDC (Sepolia), not CELO.
+- **How the customer pays:** the customer signs a payment authorisation from their own wallet and the Celo facilitator submits it. They hold USA₮ (mainnet) or test USDC (Sepolia).
 - **Pay on success:** x402 settles after the report is produced. A failed run is not charged.
 - **Safety rails the agent cannot override** (`src/policy`): per-call cap $0.05, per-task cap $0.25, daily cap $1, provider and token allowlists, kill switch (`KILL_SWITCH=1`), no spending while an earlier payment is uncertain, no duplicate payments.
 - **Two stages:** some questions get a follow-up plan (for example, fetching a vendor's recent posts). It has its own price and its own approval.

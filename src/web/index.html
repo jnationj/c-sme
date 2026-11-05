@@ -4,8 +4,22 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="dark light">
-<title>CorridorPilot</title>
-<meta name="description" content="Ask a market question. An agent finds paid Instagram and TikTok data, shows every price, and pays only after you approve.">
+<title>CorridorPilot: market research for Nigerian online sellers</title>
+<meta name="description" content="Ask what's working on Instagram and TikTok. An agent buys the data, shows every price first, and you pay only if the report is delivered. Built on Celo.">
+<meta name="theme-color" content="#0b1210">
+<link rel="canonical" href="__PUBLIC_URL__/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="CorridorPilot">
+<meta property="og:title" content="CorridorPilot: know your market, pay only for the answer">
+<meta property="og:description" content="Market research for Nigerian online sellers and creators. An agent buys Instagram and TikTok data, shows every price first, and you pay only if the report is delivered.">
+<meta property="og:url" content="__PUBLIC_URL__/">
+<meta property="og:image" content="__PUBLIC_URL__/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="CorridorPilot: know your market, pay only for the answer">
+<meta name="twitter:description" content="An agent buys Instagram and TikTok data for you, shows every price first, and you pay only if the report is delivered.">
+<meta name="twitter:image" content="__PUBLIC_URL__/og.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b1210'/%3E%3Cpath d='M6 22c6 0 6-12 12-12h8M6 10c6 0 6 12 12 12h8' fill='none' stroke='%2334e0a1' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/styles.css">
 </head>
@@ -27,14 +41,14 @@
 
 <main id="main">
   <section class="hero">
-    <p class="eyebrow">Market research for sellers and creators</p>
+    <p class="eyebrow">For Nigerian online sellers and creators</p>
     <h1>Know your market.<br><span class="grad">Pay only for the answer.</span></h1>
-    <p class="lede">Ask about Instagram or TikTok. An agent finds the right paid data, shows every price up front, and spends nothing until you approve. If it can’t deliver a report, you aren’t charged.</p>
+    <p class="lede">Ask what your competitors post, what is trending, which hooks work. An agent buys the Instagram and TikTok data, shows every price first, and you pay only if the report is delivered.</p>
     <ul class="trust" aria-label="Guarantees">
       <li><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5l4 4 8-9" /></svg>Exact price before you pay</li>
       <li><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5l4 4 8-9" /></svg>Charged only if delivered</li>
       <li><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5l4 4 8-9" /></svg>Spending limits enforced in code</li>
-      <li><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5l4 4 8-9" /></svg>Gasless, no CELO needed</li>
+      <li><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5l4 4 8-9" /></svg><span id="chipPay">Pay in USDC on Celo</span></li>
     </ul>
   </section>
 
@@ -83,6 +97,7 @@
           <div class="line"><span>Service fee</span><b id="feeUsd"></b></div>
           <div class="line grand"><span>You pay</span><b id="totalUsd"></b></div>
         </div>
+        <p class="fee-note muted small">The service fee covers writing the report, hosting, and payment settlement. The rest is the data itself, priced by each provider.</p>
         <p class="guarantee"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2l7 3v5c0 4-3 7-7 8-4-1-7-4-7-8V5l7-3z"/><path d="M7 10l2 2 4-4"/></svg>Nothing is charged until your wallet approves. You pay only if the report is delivered.</p>
         <div class="row actions">
           <button id="pay" class="btn btn-primary" type="button">Pay with my wallet</button>
@@ -109,7 +124,7 @@
           <h2 id="repTitle" tabindex="-1">Your report</h2>
           <div class="row">
             <button id="copyRep" class="btn btn-ghost btn-sm" type="button">Copy</button>
-            <a id="rcpt" class="btn btn-ghost btn-sm" target="_blank" rel="noopener">Receipt</a>
+            <a id="rcpt" class="btn btn-ghost btn-sm" target="_blank" rel="noopener" hidden>Receipt</a>
           </div>
         </div>
         <p id="repMeta" class="muted small"></p>
@@ -126,6 +141,17 @@
         <button id="again" class="btn btn-ghost" type="button">Ask another question</button>
       </section>
 
+      <section class="card why" aria-labelledby="whyTitle">
+        <h2 id="whyTitle">Why this instead of asking a chatbot?</h2>
+        <ul>
+          <li><b>Current platform data, not memory.</b> A chatbot answers from training data or whatever web pages it can open. We buy TikTok and Instagram data for your question from paid data providers.</li>
+          <li><b>Every claim has a receipt.</b> The report lists each data call with its on-chain transaction, so you can check what it was built from.</li>
+          <li><b>Price first, cents per question.</b> No subscription. You see the total, for example $0.04, before anything is paid.</li>
+          <li><b>It tells you what it doesn't know.</b> Each report ends with what the data can't answer, and the agent can't spend past hard limits.</li>
+        </ul>
+        <p class="muted small">This is not a general assistant. It does one job and shows its evidence. <a id="docsLink" target="_blank" rel="noopener">How the agent works</a></p>
+      </section>
+
       <section id="mine" class="card" hidden>
         <h2>Your reports <span class="muted small">saved in this browser only</span></h2>
         <ul id="mineList" class="mine"></ul>
@@ -136,13 +162,13 @@
       <section class="card">
         <div class="row between"><h2>Live proof</h2><span class="muted small" id="proofNet"></span></div>
         <div class="stats">
-          <div><b id="sReports">0</b><span>Paid reports</span></div>
-          <div><b id="sCustomers">0</b><span>Customers</span></div>
-          <div><b id="sRepeat">0</b><span>Repeat customers</span></div>
-          <div><b id="sChain">0</b><span>On-chain payments</span></div>
+          <div><b id="sData">0</b><span>Data purchases by the agent</span></div>
+          <div><b id="sReports">0</b><span>Reports paid by customers</span></div>
+          <div><b id="sCustomers">0</b><span>Paying customers</span></div>
+          <div><b id="sRepeat">0</b><span>Came back to pay again</span></div>
         </div>
+        <p id="proofNote" class="proof-note"></p>
         <ul id="recent" class="recent"></ul>
-        <p id="recentEmpty" class="muted small">Real payments will appear here with their transaction links.</p>
       </section>
 
       <section class="card">
@@ -163,6 +189,7 @@
           <li>Hard caps: <span id="lPer"></span> per call, <span id="lTask"></span> per report, <span id="lDay"></span> per day.</li>
           <li>Only approved providers and tokens.</li>
           <li>Never pays twice. Stops if a payment is uncertain.</li>
+          <li><b>You pay only if the report is delivered.</b> Your payment is authorised first but settles only after the report exists. If the data can't be bought, nothing is taken from you.</li>
           <li>Every payment is logged with its transaction link.</li>
         </ul>
       </section>

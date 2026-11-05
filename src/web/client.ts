@@ -1,5 +1,5 @@
 // Browser-side x402 client. Bundled to web/client.js by scripts/build-web.mjs.
-// The customer's own wallet (MetaMask etc.) signs a gasless USDC/USA₮ authorisation; no key ever touches our server.
+// The customer's own wallet (MetaMask etc.) signs a USDC/USA₮ payment authorisation; no key ever touches our server.
 import { x402Client } from "@x402/core/client";
 import { registerExactEvmScheme } from "@x402/evm/exact/client";
 import { wrapFetchWithPayment, decodePaymentResponseHeader } from "@x402/fetch";

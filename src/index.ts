@@ -62,7 +62,25 @@ const asset = (file: string, type: string) => (c: import("hono").Context) => {
   if (!existsSync(p)) return c.text("missing " + file, 404);
   return c.body(readFileSync(p), 200, { "content-type": type, "cache-control": "no-cache" });
 };
-app.get("/", asset("index.html", "text/html; charset=utf-8"));
+// The page carries absolute URLs for social previews (og:image etc.), so fill in our public address at request time.
+function publicOrigin(c: import("hono").Context): string {
+  const fixed = process.env.PUBLIC_URL?.trim().replace(/\/+$/, "");
+  if (fixed) return fixed;
+  const host = c.req.header("x-forwarded-host") ?? c.req.header("host") ?? "localhost";
+  const proto = c.req.header("x-forwarded-proto")?.split(",")[0]?.trim() ?? (host.startsWith("localhost") ? "http" : "https");
+  return `${proto}://${host}`;
+}
+app.get("/", (c) => {
+  const p = webDir + "index.html";
+  if (!existsSync(p)) return c.text("missing index.html", 404);
+  const html = readFileSync(p, "utf8").split("__PUBLIC_URL__").join(publicOrigin(c));
+  return c.html(html, 200, { "cache-control": "no-cache" });
+});
+app.get("/og.png", (c) => {
+  const p = webDir + "og.png";
+  if (!existsSync(p)) return c.text("missing og.png", 404);
+  return c.body(readFileSync(p), 200, { "content-type": "image/png", "cache-control": "public, max-age=3600" });
+});
 app.get("/app.js", asset("app.js", "text/javascript; charset=utf-8"));
 app.get("/styles.css", asset("styles.css", "text/css; charset=utf-8"));
 app.get("/client.js", (c) => {
@@ -151,7 +169,7 @@ app.post("/api/approve", async (c) => {
   try {
     const result = await agent.approve(planId ?? "");
     persist(result, null, false);
-    return c.json(result);
+    return c.json({ ...result, receipt: hasDeliverable(result.payments) });
   } catch (e) {
     return c.json({ error: (e as Error).message }, 400);
   }
@@ -301,7 +319,7 @@ if (payTo) {
         ledger.record("customer_payment_expected", { payer, amount: plan.customerAtomic.toString() }, planId);
       }
       persist(result, payer, true);
-      return c.json(result);
+      return c.json({ ...result, receipt: true });
     } catch (e) {
       return c.json({ error: (e as Error).message }, 400);
     }

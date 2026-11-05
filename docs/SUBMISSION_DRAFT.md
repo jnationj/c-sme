@@ -42,6 +42,8 @@ An agent that buys the market data a small seller or creator needs, shows every 
 
 **Demand created for the services consumed.** [Replace with real numbers on submission day: paid calls bought, distinct providers, calls per customer report (3 to 5), customers who came back.] Each paid report buys 3 to 5 calls, so customer usage translates directly into new paid calls on these services. We do not claim volume we do not have.
 
+**Why this instead of a general chatbot.** A chatbot answers from training data or the web pages it can open. We buy current TikTok and Instagram data per question from paid providers, show each price first, charge only if the report is delivered, and attach on-chain receipts to every report. We do not claim to be smarter or conversational. Full comparison: docs/HOW_IT_WORKS.md.
+
 **Reliability and honesty.** Provider errors are recorded as "failed, not charged" and never counted as delivered. If no data can be bought, the customer is not charged. The report states what the data cannot answer: for example, Instagram usually does not expose prices ("DM for price"), and TikTok trend data is US-weighted.
 
 **Celo stack used.** x402 via Celo's facilitator for customer payments (USA₮ on mainnet), x402 payments to buy-catalog services, ERC-8004 identity [registered: agentId N, tx hash], ERC-8021 attribution tag `celo_d0da34839ac6` on directly sent transactions (the facilitator does not tag x402 settlements yet, per the organisers; we declare our builder code in every 402 so tagging starts automatically when it ships).
@@ -49,8 +51,8 @@ An agent that buys the market data a small seller or creator needs, shows every 
 **Honest status.** [Replace on submission day with facts: how many real customer payments settled on mainnet, from how many distinct wallets, how many repeat. If the pilot customers' wallets are new, say so plainly.]
 
 ## Open Corridors, USA₮ with x402 (secondary; enter only with evidence)
-- Customers pay us in USA₮ through Celo's x402 facilitator, with a gasless signature. Receipts and the ledger show each settlement with its transaction link.
-- Why USA₮ fits this user: a US-regulated dollar with stable pricing for sellers in a volatile-currency market, and gasless payment means no CELO needed.
+- Customers pay us in USA₮ through Celo's x402 facilitator. Receipts and the ledger show each settlement with its transaction link.
+- Why USA₮ fits this user: a US-regulated dollar with stable pricing for sellers in a volatile-currency market.
 - Named counterparties and repeat flow: [only list people who actually paid, with permission, and how many times].
 
 ## Evidence to collect before submitting (goes in EVIDENCE.md)

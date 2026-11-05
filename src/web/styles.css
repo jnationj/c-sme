@@ -247,3 +247,10 @@ textarea:focus { outline: none; border-color: var(--acc); box-shadow: 0 0 0 4px 
   .pill { padding: 5px 9px; font-size: 0.74rem; }
   .brand span { font-size: 0.95rem; }
 }
+
+/* feedback round: notes, why-section, proof note */
+.fee-note { margin: 10px 2px 0; }
+.proof-note { margin: 0 0 10px; font-size: 0.85rem; color: var(--mute); }
+.why ul { display: grid; gap: 12px; margin-bottom: 12px; }
+.why li { font-size: 0.93rem; color: var(--mute); padding-left: 14px; border-left: 2px solid var(--acc); }
+.why li b { display: block; color: var(--ink); font-weight: 600; margin-bottom: 2px; }
