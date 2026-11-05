@@ -279,12 +279,12 @@
   function showReport(d) {
     lastReport = d.report.text;
     renderMarkdown($("repBody"), d.report.text);
-    $("repMeta").textContent = "Written by " + d.report.by + " · data cost " + usd(d.spentUsd);
+    $("repMeta").textContent = (d.report.by === "fallback" ? "Computed directly from the data (no AI writer)" : "Written by " + d.report.by + " from computed facts") + " · data cost " + usd(d.spentUsd);
     var r = $("rcpt"); r.setAttribute("href", "/r/" + encodeURIComponent(d.planId)); r.hidden = !d.receipt;
     var ul = $("repPays"); clear(ul);
     d.payments.forEach(function (p) {
       var link = p.tx ? el("a", { class: "mono", href: cfg.explorer + "/tx/" + p.tx, target: "_blank", rel: "noopener", text: short(p.tx) }) : el("span", { class: "muted small", text: p.status === "failed" ? "not charged" : p.status === "uncertain" ? "payment being checked" : "" });
-      ul.appendChild(el("li", null, el("span", { text: p.title }), el("span", { class: "st " + p.status, text: usd(p.usd) + " · " + p.status }), link));
+      ul.appendChild(el("li", null, el("span", { text: (p.ref ? p.ref + "  " : "") + p.title }), el("span", { class: "st " + p.status, text: usd(p.usd) + " · " + p.status }), link));
     });
     var fc = $("followCard");
     if (d.followUp) {
@@ -340,6 +340,12 @@
     $("free").addEventListener("click", function () { runPlan("free"); });
     $("cancel").addEventListener("click", reset);
     $("again").addEventListener("click", reset);
+    $("rerun").addEventListener("click", function () { if (lastQuestion) { $("q").value = lastQuestion; onInput(); findPlan(); } });
+    // A receipt link can prefill the question: /?q=...
+    try {
+      var pre = new URLSearchParams(location.search).get("q");
+      if (pre) { $("q").value = pre.slice(0, 500); onInput(); }
+    } catch (e) {}
     $("copyRep").addEventListener("click", function () { copyText(lastReport, $("copyRep")); });
     api("/api/config").then(function (c) { cfg = c; setNet(); loadProof(); setInterval(loadProof, 20000); })
       .catch(function () { alertMsg("Could not reach the server. Refresh in a moment."); });

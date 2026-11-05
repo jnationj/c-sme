@@ -61,6 +61,14 @@ export class Ledger {
         created_at INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS reports_payer ON reports(payer);
+      CREATE TABLE IF NOT EXISTS raw_outputs (
+        plan_id TEXT NOT NULL,
+        idx INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        output TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        PRIMARY KEY (plan_id, idx)
+      );
     `);
   }
 
@@ -116,6 +124,25 @@ export class Ledger {
       )
       .run(r.planId, r.question, r.report, r.writtenBy, JSON.stringify(r.payments), r.dataAtomic.toString(), r.customerAtomic?.toString() ?? null, r.payer?.toLowerCase() ?? null, now);
     this.record("report.saved", { planId: r.planId, payer: r.payer }, r.planId, now);
+  }
+
+  /** Stores the raw provider response (capped) for one purchase. */
+  saveRaw(planId: string, idx: number, title: string, output: unknown, now = Date.now()): void {
+    const text = JSON.stringify(output ?? null) ?? "null";
+    this.db
+      .prepare("INSERT OR REPLACE INTO raw_outputs (plan_id, idx, title, output, created_at) VALUES (?, ?, ?, ?, ?)")
+      .run(planId, idx, title, text.length > 400_000 ? text.slice(0, 400_000) : text, now);
+  }
+
+  getRaw(planId: string): Array<{ idx: number; title: string; output: unknown }> {
+    const rows = this.db.prepare("SELECT idx, title, output FROM raw_outputs WHERE plan_id = ? ORDER BY idx").all(planId) as Array<{ idx: number; title: string; output: string }>;
+    return rows.map((r) => {
+      try {
+        return { idx: r.idx, title: r.title, output: JSON.parse(r.output) as unknown };
+      } catch {
+        return { idx: r.idx, title: r.title, output: null };
+      }
+    });
   }
 
   getReport(planId: string): (SavedReport & { createdAt: number }) | undefined {

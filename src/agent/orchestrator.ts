@@ -30,6 +30,9 @@ export interface OrchestratorOpts {
   feeAtomic: bigint;
   /** Optional payer (direct x402). Defaults to the buy CLI. Must enforce the approved max amount itself. */
   pay?: (a: { url: string; body: unknown; maxAtomic: bigint }) => Promise<BuyResult>;
+  /** Test hooks: replace catalog-based planning so tests never touch the network. */
+  planFn?: (question: string) => Promise<PlanStep[]>;
+  followUpFn?: (bought: StepResult[]) => Promise<PlanStep[]>;
 }
 
 export class Orchestrator {
@@ -49,7 +52,7 @@ export class Orchestrator {
   }
 
   async propose(question: string): Promise<Plan> {
-    const steps = await planSteps(question);
+    const steps = await (this.o.planFn ?? planSteps)(question);
     const plan: Plan = {
       id: randomUUID(),
       question,
@@ -83,7 +86,8 @@ export class Orchestrator {
 
     const results: StepResult[] = [];
     const bought: StepResult[] = [];
-    const log: Array<{ title: string; usd: string; status: string; tx: string | null; note?: string }> = [];
+    let refN = plan.prior?.length ?? 0; // citation labels S1, S2, ... continue across stages
+    const log: Array<{ title: string; usd: string; status: string; tx: string | null; note?: string; ref?: string }> = [];
     for (const [i, s] of plan.steps.entries()) {
       const key = `${plan.id}:${i}`;
       const decision = evaluateSpend(
@@ -129,9 +133,12 @@ export class Orchestrator {
           ledger.record("price_above_quote", { quoted: s.quoteAtomic.toString(), paid: r.paidAtomic }, plan.id);
         }
         plan.progress[i] = { state: "settled", tx: r.transaction };
-        results.push({ title: s.title, why: s.why, output: r.output });
-        bought.push({ title: s.title, why: s.why, output: r.output });
+        const ref = "S" + ++refN;
+        ledger.saveRaw(plan.id, i, s.title, r.output); // keep what was bought so reports can be re-analysed without paying again
+        results.push({ title: s.title, why: s.why, output: r.output, ref });
+        bought.push({ title: s.title, why: s.why, output: r.output, ref });
         log.push({
+          ref,
           title: s.title,
           usd: formatUsd(r.paidAtomic ? BigInt(r.paidAtomic) : s.quoteAtomic),
           status: "settled",
@@ -162,7 +169,7 @@ export class Orchestrator {
     plan.stage = "done";
     let followUp: { id: string; totalUsd: string; customerUsd: string; steps: Array<{ provider: string; why: string; usd: string }> } | undefined;
     if (!plan.prior && results.length) {
-      const fs = await followUpSteps(bought);
+      const fs = await (this.o.followUpFn ?? followUpSteps)(bought);
       if (fs.length) {
         const child: Plan = { id: randomUUID(), question: plan.question, steps: fs, totalAtomic: fs.reduce((a, s) => a + s.quoteAtomic, 0n), customerAtomic: 0n, status: "proposed", prior: allResults, stage: "queued", progress: fs.map(() => ({ state: "pending" as const, tx: null })) };
         child.customerAtomic = child.totalAtomic + this.o.feeAtomic;

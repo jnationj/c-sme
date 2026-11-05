@@ -46,6 +46,7 @@ pre{white-space:pre-wrap;word-break:break-word;font:inherit;margin:0}.badge{disp
 <div class="card"><strong>Customer payment</strong>
 <table><tr><th>Paid</th><th>From</th><th>Transaction</th></tr>
 <tr><td>${v.customerUsd ? "$" + esc(v.customerUsd) : "n/a (operator test run)"}</td><td>${v.payer ? esc(v.payer.slice(0, 6) + "…" + v.payer.slice(-4)) : "n/a"}</td><td>${txLink(v.explorerTx, v.customerTx)}</td></tr></table></div>
-<p class="mute">The agent only reports what the purchased data shows and states what it cannot answer. <a href="/">Make your own</a></p>
+<p><a class="again" href="/?q=${encodeURIComponent(v.question)}">Run this question again with fresh data</a></p>
+<p class="mute">The agent only reports what the purchased data shows and states what it cannot answer. <a href="/">Ask your own question</a></p>
 </main></body></html>`;
 }
