@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>CorridorPilot</title>
+<meta name="description" content="Ask a market question. An agent finds paid Instagram and TikTok data, shows every price, and pays only after you approve.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b1210'/%3E%3Cpath d='M6 22c6 0 6-12 12-12h8M6 10c6 0 6 12 12 12h8' fill='none' stroke='%2334e0a1' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body data-view="ask">
+<a class="skip" href="#main">Skip to content</a>
+
+<div id="modeBanner" class="mode-banner" hidden></div>
+
+<header class="topbar">
+  <a class="brand" href="/" aria-label="CorridorPilot home">
+    <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" class="logo-bg"/><path d="M6 22c6 0 6-12 12-12h8M6 10c6 0 6 12 12 12h8" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+    <span>CorridorPilot</span>
+  </a>
+  <div class="topbar-right">
+    <span id="netPill" class="pill" title="Network"><i class="dot"></i><span>…</span></span>
+    <button id="connect" class="btn btn-ghost" type="button">Connect wallet</button>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero">
+    <p class="eyebrow">Market research for sellers and creators</p>
+    <h1>Know your market.<br><span class="grad">Pay only for the answer.</span></h1>
+    <p class="lede">Ask about Instagram or TikTok. An agent finds the right paid data, shows every price up front, and spends nothing until you approve. If it can’t deliver a report, you aren’t charged.</p>
+    <ul class="trust" aria-label="Guarantees">
+      <li><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5l4 4 8-9" /></svg>Exact price before you pay</li>
+      <li><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5l4 4 8-9" /></svg>Charged only if delivered</li>
+      <li><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5l4 4 8-9" /></svg>Spending limits enforced in code</li>
+      <li><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5l4 4 8-9" /></svg>Gasless, no CELO needed</li>
+    </ul>
+  </section>
+
+  <div class="layout">
+    <div class="col-main">
+      <ol class="stepper" id="stepper" aria-label="Progress">
+        <li data-step="ask" class="active"><b>1</b><span>Ask</span></li>
+        <li data-step="plan"><b>2</b><span>Review price</span></li>
+        <li data-step="run"><b>3</b><span>Pay &amp; run</span></li>
+        <li data-step="report"><b>4</b><span>Report</span></li>
+      </ol>
+
+      <div id="alert" class="alert" role="alert" hidden></div>
+
+      <!-- 1. ASK -->
+      <section id="vAsk" class="card view" aria-labelledby="askTitle">
+        <h2 id="askTitle">What do you want to know?</h2>
+        <label class="sr" for="q">Your question</label>
+        <textarea id="q" maxlength="500" rows="3" placeholder="e.g. What hooks and formats work best for small AI accounts on TikTok?"></textarea>
+        <div class="row between">
+          <span id="count" class="muted small">0 / 500</span>
+          <button id="go" class="btn btn-primary" type="button" disabled>Find sources &amp; price <svg viewBox="0 0 20 20" aria-hidden="true" class="arrow"><path d="M4 10h11M11 5l5 5-5 5"/></svg></button>
+        </div>
+        <div class="examples">
+          <p class="muted small">Try one</p>
+          <div id="chips" class="chips"></div>
+        </div>
+      </section>
+
+      <!-- planning skeleton -->
+      <section id="vLoading" class="card view" hidden aria-live="polite">
+        <h2>Finding the right sources…</h2>
+        <div class="skel"></div><div class="skel"></div><div class="skel short"></div>
+      </section>
+
+      <!-- 2. PLAN -->
+      <section id="vPlan" class="card view" hidden aria-labelledby="planTitle">
+        <div class="row between">
+          <h2 id="planTitle" tabindex="-1">Your plan</h2>
+          <span id="planNote" class="chip"></span>
+        </div>
+        <p id="planQ" class="quote"></p>
+        <ul id="planList" class="sources"></ul>
+        <div class="total-box">
+          <div class="line"><span>Data from providers</span><b id="dataUsd"></b></div>
+          <div class="line"><span>Service fee</span><b id="feeUsd"></b></div>
+          <div class="line grand"><span>You pay</span><b id="totalUsd"></b></div>
+        </div>
+        <p class="guarantee"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2l7 3v5c0 4-3 7-7 8-4-1-7-4-7-8V5l7-3z"/><path d="M7 10l2 2 4-4"/></svg>Nothing is charged until your wallet approves. You pay only if the report is delivered.</p>
+        <div class="row actions">
+          <button id="pay" class="btn btn-primary" type="button">Pay with my wallet</button>
+          <button id="free" class="btn btn-ghost" type="button" hidden>Run with test funds</button>
+          <button id="cancel" class="btn btn-link" type="button">Start over</button>
+        </div>
+      </section>
+
+      <!-- 3. RUN -->
+      <section id="vRun" class="card view" hidden aria-labelledby="runTitle" aria-live="polite">
+        <div class="row between">
+          <h2 id="runTitle" tabindex="-1">Working on it</h2>
+          <span id="elapsed" class="muted small">0s</span>
+        </div>
+        <p id="runStage" class="muted"></p>
+        <ol id="runList" class="timeline"></ol>
+        <div class="bar"><i id="barFill"></i></div>
+        <p class="muted small">Each data source takes about 10 seconds to settle on Celo.</p>
+      </section>
+
+      <!-- 4. REPORT -->
+      <section id="vReport" class="card view" hidden aria-labelledby="repTitle">
+        <div class="row between wrap">
+          <h2 id="repTitle" tabindex="-1">Your report</h2>
+          <div class="row">
+            <button id="copyRep" class="btn btn-ghost btn-sm" type="button">Copy</button>
+            <a id="rcpt" class="btn btn-ghost btn-sm" target="_blank" rel="noopener">Receipt</a>
+          </div>
+        </div>
+        <p id="repMeta" class="muted small"></p>
+        <article id="repBody" class="report"></article>
+        <h3 class="sub">What was bought</h3>
+        <ul id="repPays" class="pays"></ul>
+        <div id="followCard" class="follow" hidden>
+          <div>
+            <b>Go deeper</b>
+            <p id="followText" class="muted small"></p>
+          </div>
+          <button id="followBtn" class="btn btn-primary btn-sm" type="button">Review price</button>
+        </div>
+        <button id="again" class="btn btn-ghost" type="button">Ask another question</button>
+      </section>
+
+      <section id="mine" class="card" hidden>
+        <h2>Your reports <span class="muted small">saved in this browser only</span></h2>
+        <ul id="mineList" class="mine"></ul>
+      </section>
+    </div>
+
+    <aside class="col-side" aria-label="Proof and safety">
+      <section class="card">
+        <div class="row between"><h2>Live proof</h2><span class="muted small" id="proofNet"></span></div>
+        <div class="stats">
+          <div><b id="sReports">0</b><span>Paid reports</span></div>
+          <div><b id="sCustomers">0</b><span>Customers</span></div>
+          <div><b id="sRepeat">0</b><span>Repeat customers</span></div>
+          <div><b id="sChain">0</b><span>On-chain payments</span></div>
+        </div>
+        <ul id="recent" class="recent"></ul>
+        <p id="recentEmpty" class="muted small">Real payments will appear here with their transaction links.</p>
+      </section>
+
+      <section class="card">
+        <h2>The agent</h2>
+        <dl class="kv">
+          <div><dt>Wallet</dt><dd id="kWallet">…</dd></div>
+          <div><dt>Attribution tag</dt><dd id="kTag">…</dd></div>
+          <div id="kIdRow" hidden><dt>Identity (ERC-8004)</dt><dd id="kId"></dd></div>
+          <div><dt>Settles in</dt><dd id="kToken">…</dd></div>
+          <div><dt>Code</dt><dd><a id="kRepo" target="_blank" rel="noopener">GitHub</a></dd></div>
+        </dl>
+      </section>
+
+      <section class="card">
+        <h2>Kept safe by design</h2>
+        <ul class="safe">
+          <li>The AI writes. <b>A rules engine, not the AI, approves every payment.</b></li>
+          <li>Hard caps: <span id="lPer"></span> per call, <span id="lTask"></span> per report, <span id="lDay"></span> per day.</li>
+          <li>Only approved providers and tokens.</li>
+          <li>Never pays twice. Stops if a payment is uncertain.</li>
+          <li>Every payment is logged with its transaction link.</li>
+        </ul>
+      </section>
+    </aside>
+  </div>
+</main>
+
+<footer class="foot">
+  <span>CorridorPilot, built for the Agents on Open Rails hackathon on Celo.</span>
+  <span class="muted">Reports describe public data and say what the data cannot answer. Verify before you rely on them.</span>
+</footer>
+
+<script src="/client.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>
