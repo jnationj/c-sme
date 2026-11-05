@@ -7,6 +7,7 @@ import { Orchestrator, policyFromEnv } from "./agent/orchestrator.js";
 import { formatUsd, parseUsd } from "./chain/tokens.js";
 import { PAGE } from "./web/page.js";
 import { decodeSettlement, hasDeliverable } from "./agent/delivery.js";
+import { renderReceipt } from "./web/receipt.js";
 
 const testnet = (process.env.X402_NETWORK ?? "testnet") !== "mainnet";
 const tokenInfo = sellerToken(testnet);
@@ -70,11 +71,72 @@ app.post("/api/approve", async (c) => {
   }
   const { planId } = await c.req.json<{ planId?: string }>();
   try {
-    return c.json(await agent.approve(planId ?? ""));
+    const result = await agent.approve(planId ?? "");
+    persist(result, null, false);
+    return c.json(result);
   } catch (e) {
     return c.json({ error: (e as Error).message }, 400);
   }
 });
+
+type RunResult = Awaited<ReturnType<Orchestrator["approve"]>>;
+/** Save a finished report so it can be shown as a shareable receipt later. */
+function persist(result: RunResult, payer: string | null, paid: boolean): void {
+  const plan = agent.getPlan(result.planId);
+  if (!plan || !hasDeliverable(result.payments)) return;
+  ledger.saveReport({
+    planId: result.planId,
+    question: plan.question,
+    report: result.report.text,
+    writtenBy: result.report.by,
+    payments: result.payments,
+    dataAtomic: ledger.spentForTask(result.planId),
+    customerAtomic: paid ? plan.customerAtomic : null,
+    payer,
+  });
+}
+
+const explorerTx = testnet ? "https://celo-sepolia.blockscout.com/tx/" : "https://celoscan.io/tx/";
+function receiptFor(planId: string) {
+  const r = ledger.getReport(planId);
+  if (!r) return undefined;
+  const inRow = ledger.getPayment("in:" + planId);
+  return {
+    planId: r.planId,
+    question: r.question,
+    report: r.report,
+    writtenBy: r.writtenBy,
+    network: testnet ? "Celo Sepolia (test money)" : "Celo mainnet (real money)",
+    explorerTx,
+    createdAt: r.createdAt,
+    dataUsd: formatUsd(r.dataAtomic),
+    customerUsd: r.customerAtomic === null ? null : formatUsd(r.customerAtomic),
+    payer: r.payer,
+    customerTx: inRow?.txHash ?? null,
+    purchases: (r.payments as Array<{ title: string; usd: string; status: string; tx: string | null }>).map((p) => ({ title: p.title, usd: p.usd, status: p.status, tx: p.tx })),
+  };
+}
+app.get("/r/:planId", (c) => {
+  const v = receiptFor(c.req.param("planId"));
+  return v ? c.html(renderReceipt(v)) : c.text("receipt not found", 404);
+});
+app.get("/api/receipt/:planId", (c) => {
+  const v = receiptFor(c.req.param("planId"));
+  return v ? c.json(v) : c.json({ error: "not found" }, 404);
+});
+// Anonymous usage stats for the operator: counts and totals per (shortened) customer wallet, no questions.
+app.get("/api/customers", (c) =>
+  c.json(
+    ledger.customerStats().map((x) => ({
+      customer: x.payer.slice(0, 6) + "…" + x.payer.slice(-4),
+      runs: x.runs,
+      paidUsd: formatUsd(x.paidAtomic),
+      repeat: x.runs > 1,
+      firstAt: x.firstAt,
+      lastAt: x.lastAt,
+    })),
+  ),
+);
 
 app.get("/api/ledger", (c) => {
   const rows = ledger.db.prepare("SELECT * FROM payments ORDER BY created_at DESC LIMIT 50").all() as any[];
@@ -154,6 +216,7 @@ if (payTo) {
         ledger.setStatus(key, "submitted"); // becomes settled once the facilitator settlement is confirmed
         ledger.record("customer_payment_expected", { payer, amount: plan.customerAtomic.toString() }, planId);
       }
+      persist(result, payer, true);
       return c.json(result);
     } catch (e) {
       return c.json({ error: (e as Error).message }, 400);

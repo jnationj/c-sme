@@ -51,7 +51,12 @@ details summary{cursor:pointer;font-weight:600}details ol{margin:8px 0 0;padding
 </div>
 
 <div class="card" id="repBox" hidden><strong>Report</strong> <span class="mute" id="by"></span><pre id="rep" style="margin-top:8px"></pre>
-  <table id="payTbl" style="margin-top:12px"></table></div>
+  <p id="rcpt" class="mute" style="margin:10px 0 0"></p><table id="payTbl" style="margin-top:12px"></table></div>
+
+<div class="card" id="mineBox" hidden><strong>Your reports</strong> <span class="mute">(saved in this browser only)</span><table id="mine"></table></div>
+
+<div class="card"><strong>Customer activity</strong> <span class="mute">(anonymous: shortened wallets, counts and totals)</span>
+  <table id="cust"><tr><td class="mute">loading...</td></tr></table></div>
 
 <div class="card"><strong>Audit ledger</strong> <span class="mute">(every payment, in and out)</span>
   <table id="led"><tr><td class="mute">loading...</td></tr></table></div>
@@ -67,11 +72,16 @@ function showPlan(p,title){plan=p;$('planTitle').textContent=title;
  $('planTbl').innerHTML='<tr><th>Source</th><th>Why</th><th>Price</th></tr>'+p.steps.map(s=>'<tr><td>'+esc(s.provider)+'</td><td>'+esc(s.why)+'</td><td>$'+esc(s.usd)+'</td></tr>').join('');
  $('dataUsd').textContent='$'+p.dataUsd;$('feeUsd').textContent='$'+p.feeUsd;$('total').textContent='$'+p.customerUsd;
  $('planNote').textContent=p.steps.length+' paid calls';$('pay').disabled=!p.steps.length;$('free').disabled=!p.steps.length;$('payMsg').textContent='';$('planBox').hidden=false}
+const HKEY='cp_reports';
+function mineList(){try{return JSON.parse(localStorage.getItem(HKEY)||'[]')}catch(e){return[]}}
+function remember(d){if(!d.planId||!d.report)return;try{const q=($('q').value||'').trim();const l=mineList().filter(x=>x.id!==d.planId);l.unshift({id:d.planId,q:q.slice(0,120),at:Date.now()});localStorage.setItem(HKEY,JSON.stringify(l.slice(0,30)))}catch(e){}renderMine()}
+function renderMine(){const l=mineList();$('mineBox').hidden=!l.length;$('mine').innerHTML=l.map(x=>'<tr><td>'+new Date(x.at).toLocaleString()+'</td><td>'+esc(x.q||'report')+'</td><td><a href="/r/'+encodeURIComponent(x.id)+'" target="_blank">receipt</a></td></tr>').join('')}
+async function customers(){try{const d=await j('/api/customers');$('cust').innerHTML=d.length?'<tr><th>Customer</th><th>Runs</th><th>Paid</th><th>Last used</th></tr>'+d.map(x=>'<tr><td>'+esc(x.customer)+(x.repeat?' <span class="ok">(repeat)</span>':'')+'</td><td>'+x.runs+'</td><td>$'+esc(x.paidUsd)+'</td><td>'+new Date(x.lastAt).toLocaleString()+'</td></tr>').join(''):'<tr><td class="mute">no paying customers yet</td></tr>'}catch(e){}}
 function showResult(d){$('rep').textContent=d.report.text;$('by').textContent='written by '+d.report.by+' - data cost $'+d.spentUsd;
  $('payTbl').innerHTML='<tr><th>Call</th><th>USD</th><th>Status</th></tr>'+d.payments.map(p=>'<tr><td>'+esc(p.title)+'</td><td>'+esc(p.usd)+'</td><td class="'+cls(p.status)+'">'+esc(p.status)+(p.note?' - '+esc(p.note):'')+'</td></tr>').join('');
- $('repBox').hidden=false;$('planBox').hidden=true;plan=null;
+ $('repBox').hidden=false;$('planBox').hidden=true;plan=null;$('rcpt').innerHTML=d.planId?'<a href="/r/'+encodeURIComponent(d.planId)+'" target="_blank">Open shareable receipt</a>':'';
  if(d.followUp){showPlan({id:d.followUp.id,steps:d.followUp.steps,dataUsd:d.followUp.totalUsd,feeUsd:cfg.feeUsd,customerUsd:d.followUp.customerUsd},'Follow-up for more detail')}
- ledger()}
+ ledger();customers()}
 async function init(){cfg=await j('/api/config');$('net').textContent=cfg.network;$('free').hidden=!cfg.freeRunAllowed;ledger()}
 document.querySelectorAll('.ex button').forEach(b=>b.onclick=()=>{$('q').value=b.dataset.q});
 $('connect').onclick=async()=>{try{addr=await window.CP.connect(cfg.chainId);$('who').textContent='Connected: '+addr.slice(0,6)+'...'+addr.slice(-4);$('connect').textContent='Connected'}catch(e){alert(e.message)}};
@@ -85,5 +95,5 @@ $('pay').onclick=async()=>{if(!plan)return;if(!addr){$('payMsg').textContent='Co
  catch(e){$('payMsg').textContent='Not completed: '+e.message}$('pay').disabled=false};
 $('free').onclick=async()=>{if(!plan)return;$('free').disabled=true;$('payMsg').textContent='Running with the agent test funds...';
  try{showResult(await j('/api/approve',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({planId:plan.id})}))}catch(e){$('payMsg').textContent='Failed: '+e.message}$('free').disabled=false};
-init();
+init();renderMine();customers();
 </script></main></body></html>`;

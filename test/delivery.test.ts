@@ -55,3 +55,42 @@ describe("Ledger.countIncoming (Finding 2: bound exposure to unsettled customer 
     expect(l.countIncoming("submitted", 5 * 60_000, now)).toBe(1);
   });
 });
+
+describe("Ledger reports and customer stats", () => {
+  const rep = (planId: string, payer: string | null, customer: bigint | null) => ({
+    planId,
+    question: "q",
+    report: "r",
+    writtenBy: "deepseek",
+    payments: [{ title: "t", usd: "0.005", status: "settled", tx: null }],
+    dataAtomic: 19000n,
+    customerAtomic: customer,
+    payer,
+  });
+
+  it("saves and reads back a report", () => {
+    const l = new Ledger();
+    l.saveReport(rep("p1", "0xABCDEF0000000000000000000000000000000001", 39000n));
+    const r = l.getReport("p1");
+    expect(r?.question).toBe("q");
+    expect(r?.dataAtomic).toBe(19000n);
+    expect(r?.payer).toBe("0xabcdef0000000000000000000000000000000001"); // stored lowercased
+    expect(l.getReport("missing")).toBeUndefined();
+  });
+
+  it("aggregates repeat customers and ignores operator runs with no payer", () => {
+    const l = new Ledger();
+    const a = "0xaaaa000000000000000000000000000000000001";
+    const b = "0xbbbb000000000000000000000000000000000002";
+    l.saveReport(rep("p1", a, 39000n), 1000);
+    l.saveReport(rep("p2", a, 41000n), 2000);
+    l.saveReport(rep("p3", b, 39000n), 3000);
+    l.saveReport(rep("p4", null, null), 4000);
+    const stats = l.customerStats();
+    expect(stats).toHaveLength(2);
+    const sa = stats.find((x) => x.payer === a)!;
+    expect(sa.runs).toBe(2);
+    expect(sa.paidAtomic).toBe(80000n);
+    expect(stats.find((x) => x.payer === b)!.runs).toBe(1);
+  });
+});

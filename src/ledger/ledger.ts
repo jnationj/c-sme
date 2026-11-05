@@ -49,6 +49,18 @@ export class Ledger {
         updated_at INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS payments_task ON payments(task_id);
+      CREATE TABLE IF NOT EXISTS reports (
+        plan_id TEXT PRIMARY KEY,
+        question TEXT NOT NULL,
+        report TEXT NOT NULL,
+        written_by TEXT NOT NULL,
+        payments TEXT NOT NULL,
+        data_atomic TEXT NOT NULL,
+        customer_atomic TEXT,
+        payer TEXT,
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS reports_payer ON reports(payer);
     `);
   }
 
@@ -97,6 +109,41 @@ export class Ledger {
     return r !== undefined;
   }
 
+  saveReport(r: SavedReport, now = Date.now()): void {
+    this.db
+      .prepare(
+        "INSERT OR REPLACE INTO reports (plan_id, question, report, written_by, payments, data_atomic, customer_atomic, payer, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      )
+      .run(r.planId, r.question, r.report, r.writtenBy, JSON.stringify(r.payments), r.dataAtomic.toString(), r.customerAtomic?.toString() ?? null, r.payer?.toLowerCase() ?? null, now);
+    this.record("report.saved", { planId: r.planId, payer: r.payer }, r.planId, now);
+  }
+
+  getReport(planId: string): (SavedReport & { createdAt: number }) | undefined {
+    const row = this.db.prepare("SELECT * FROM reports WHERE plan_id = ?").get(planId) as Record<string, unknown> | undefined;
+    return row && rowToReport(row);
+  }
+
+  reportsForPayer(payer: string, limit = 20): Array<SavedReport & { createdAt: number }> {
+    const rows = this.db.prepare("SELECT * FROM reports WHERE payer = ? ORDER BY created_at DESC LIMIT ?").all(payer.toLowerCase(), limit) as Record<string, unknown>[];
+    return rows.map(rowToReport);
+  }
+
+  /** Per-customer usage: how many paid runs and how much, plus first/last activity. Repeat use = runs > 1. */
+  customerStats(): Array<{ payer: string; runs: number; paidAtomic: bigint; firstAt: number; lastAt: number }> {
+    const rows = this.db
+      .prepare("SELECT payer, customer_atomic, created_at FROM reports WHERE payer IS NOT NULL ORDER BY created_at")
+      .all() as Array<{ payer: string; customer_atomic: string | null; created_at: number }>;
+    const by = new Map<string, { payer: string; runs: number; paidAtomic: bigint; firstAt: number; lastAt: number }>();
+    for (const r of rows) {
+      const c = by.get(r.payer) ?? { payer: r.payer, runs: 0, paidAtomic: 0n, firstAt: r.created_at, lastAt: r.created_at };
+      c.runs += 1;
+      c.paidAtomic += BigInt(r.customer_atomic ?? "0");
+      c.lastAt = r.created_at;
+      by.set(r.payer, c);
+    }
+    return [...by.values()].sort((a, b) => b.lastAt - a.lastAt);
+  }
+
   /** Number of customer (incoming) payments in a status. Used to stop serving when settlements keep failing. */
   countIncoming(status: PaymentStatus, olderThanMs = 0, now = Date.now()): number {
     const r = this.db
@@ -136,4 +183,29 @@ function rowToPayment(r: Record<string, unknown>): PaymentRow {
 export function startOfUtcDay(now = Date.now()): number {
   const d = new Date(now);
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+
+export interface SavedReport {
+  planId: string;
+  question: string;
+  report: string;
+  writtenBy: string;
+  payments: unknown;
+  dataAtomic: bigint;
+  customerAtomic: bigint | null;
+  payer: string | null;
+}
+
+function rowToReport(r: Record<string, unknown>): SavedReport & { createdAt: number } {
+  return {
+    planId: r.plan_id as string,
+    question: r.question as string,
+    report: r.report as string,
+    writtenBy: r.written_by as string,
+    payments: JSON.parse(r.payments as string),
+    dataAtomic: BigInt(r.data_atomic as string),
+    customerAtomic: r.customer_atomic == null ? null : BigInt(r.customer_atomic as string),
+    payer: (r.payer as string | null) ?? null,
+    createdAt: r.created_at as number,
+  };
 }
