@@ -43,3 +43,23 @@ Important limits of this evidence:
 - The three data purchases are an **operator smoke test** (one report, run locally by the project owner with the agent wallet). They are **not customer payments**.
 - **No customer has paid on mainnet yet.** Customer counts in the product are zero until that happens.
 - The report from this run is saved in `docs/examples/first-mainnet-report.md`.
+
+## Live site, customer-payment flow on Celo mainnet (team wallet), 2026-11-05
+A full end-to-end run on the live site, https://c-sme-production.up.railway.app, receipt page: [/r/1ea7216d-07cd-4246-9d4d-822a844532fc](https://c-sme-production.up.railway.app/r/1ea7216d-07cd-4246-9d4d-822a844532fc).
+
+| Step | Transaction | What happened |
+|---|---|---|
+| Funding of the test customer wallet | [0x88ad2b7fa8…](https://celoscan.io/tx/0x88ad2b7fa8cd68bfeb90bcfe45f5e175524d5fa48721e85afa7637a5dd00c80b) | Agent wallet sent $0.05 USA₮ to the project owner's own wallet `0x7216…bfCc` so it could act as a test customer. |
+| **Customer payment (settled)** | [0x95a8b13048…](https://celoscan.io/tx/0x95a8b130481e9328b2b2513371cfb605b0407db457ffe2dbe41dd791ab1a9c1a) | `0x7216…bfCc` paid $0.039 USA₮ to the agent wallet through Celo's x402 facilitator. |
+| Data purchase S1 (TikHub) | [0x9f97b99f41…](https://celoscan.io/tx/0x9f97b99f4185e772af6788d09afa6a7e6dd5f9ae576f870b0d743f33b2ac73ae) | $0.005 |
+| Data purchase S2 (TikHub) | [0x443135735c…](https://celoscan.io/tx/0x443135735c1369ebdf8fed9b8ad5e8313e672355f95d2e2d8144c08425a10e16) | $0.005 |
+| Data purchase S3 (Apify) | [0xc2dcb8632f…](https://celoscan.io/tx/0xc2dcb8632fd5040f15c45532926154412fb580862398db65560d9e880ff5122b) | $0.009 |
+
+All five were verified on-chain (status success; amounts and addresses as listed). The customer paid $0.039; the agent paid $0.019 for data; the $0.020 difference is the service fee.
+
+**This is a team test, not independent usage.** The paying wallet belongs to the project owner and was funded by the agent wallet. The live "Live proof" panel counts it under "team test reports", not under customers, and the site's customer counts remain zero until someone outside the team pays.
+
+### Things that went wrong during testing (kept here for honesty)
+- **Self-payment refused.** The agent wallet tried to pay its own site as a customer. The facilitator refused: "The payer and the recipient are the same address… refused before it reached the chain, so nothing was spent." No customer money moved, but the agent had already bought $0.019 of data. The site now rejects a self-payment before buying anything.
+- **An earlier test run** (about 13 minutes before) also bought $0.019 of data whose customer payment did not settle. The project owner confirmed that was their own test. The same up-front check now prevents that case.
+- **Sandbox allowance.** The buy gateway's test sandbox limits each paying address per day, which is why the live demo runs on mainnet.

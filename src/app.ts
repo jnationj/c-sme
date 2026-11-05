@@ -214,7 +214,7 @@ export function createApp(d: AppDeps): Hono {
       payer: r.payer,
       customerTx: inRow?.txHash ?? null,
       customerStatus: inRow?.status ?? null,
-      purchases: (r.payments as Array<{ title: string; usd: string; status: string; tx: string | null }>).map((p) => ({ title: p.title, usd: p.usd, status: p.status, tx: p.tx })),
+      purchases: (r.payments as Array<{ ref?: string; title: string; usd: string; status: string; tx: string | null }>).map((p) => ({ ref: p.ref, title: p.title, usd: p.usd, status: p.status, tx: p.tx })),
     };
   }
   app.get("/r/:planId", (c) => {

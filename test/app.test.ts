@@ -142,6 +142,10 @@ describe("a full run (operator test-funds path)", () => {
     const html = await page.text();
     expect(html).toContain("What hooks work for small AI creators on TikTok?");
     expect(html).toContain("Run this question again");
+    expect(html).toContain("<h4>What the data shows</h4>"); // the report is rendered, not shown as raw markdown
+    expect(html).toContain("<li>");
+    expect(html).not.toContain("## What the data shows");
+    expect(html).toContain("<b>S1</b>");
 
     expect(await json(await app.request("/api/receipt/" + plan.id))).toMatchObject({ planId: plan.id, dataUsd: "0.014" });
     const prog = await json(await app.request("/api/progress/" + plan.id));
@@ -300,5 +304,26 @@ describe("rate limits", () => {
 
   it("refuses to start with a nonsense limit instead of silently disabling it", () => {
     expect(() => make({ env: { RATE_PLANS_PER_HOUR: "lots" } })).toThrow(/positive integer/);
+  });
+});
+
+import { renderReportHtml } from "../src/web/receipt.js";
+
+describe("renderReportHtml (reports contain text from an AI and from data providers: it must never inject markup)", () => {
+  it("escapes HTML before formatting anything", () => {
+    const html = renderReportHtml('## Title <img src=x onerror=alert(1)>\n- **bold** <script>alert(1)</script> and `code`');
+    expect(html).not.toContain("<script>");
+    expect(html).not.toContain("<img");
+    expect(html).toContain("&lt;script&gt;");
+    expect(html).toContain("<strong>bold</strong>");
+    expect(html).toContain("<code>code</code>");
+    expect(html).toContain("<h4>");
+    expect(html).toContain("<li>");
+  });
+  it("renders plain paragraphs and numbered lists", () => {
+    const html = renderReportHtml("intro line\n\n1. first\n2. second");
+    expect(html).toContain("<p>intro line</p>");
+    expect(html).toContain("<ol>");
+    expect(html.match(/<li>/g)).toHaveLength(2);
   });
 });
