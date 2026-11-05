@@ -295,5 +295,20 @@ if (payTo) {
   console.warn("SELLER_PAY_TO not set: paid routes disabled");
 }
 
+// Startup report for the host logs: names and yes/no only, never values.
+const present = (v: string | undefined) => (v && v.trim() ? "set" : "MISSING");
+console.log("config check:", {
+  network: testnet ? "testnet" : "MAINNET",
+  payBackend,
+  SELLER_PAY_TO: present(process.env.SELLER_PAY_TO),
+  X402_API_KEY: present(process.env.X402_API_KEY),
+  payerKey: present(process.env.PAY_PRIVATE_KEY ?? process.env.AGENT_PRIVATE_KEY),
+  DEEPSEEK_API_KEY: present(process.env.DEEPSEEK_API_KEY),
+  ledger: process.env.LEDGER_PATH ?? "data/ledger.db",
+});
+if (!process.env.X402_API_KEY) console.warn("X402_API_KEY is missing: customer payments cannot settle until it is set.");
+if (!process.env.DEEPSEEK_API_KEY && !process.env.ANTHROPIC_API_KEY) console.warn("No LLM key set: reports will be a plain data list.");
+
+// Hosts route traffic from outside the container, so bind all interfaces explicitly and honour the host's PORT.
 const port = Number(process.env.PORT ?? 8787);
-serve({ fetch: app.fetch, port }, (i) => console.log(`c-sme listening on http://localhost:${i.port} (${testnet ? "testnet" : "MAINNET"})`));
+serve({ fetch: app.fetch, port, hostname: "0.0.0.0" }, (i) => console.log(`c-sme listening on 0.0.0.0:${i.port} (${testnet ? "testnet" : "MAINNET"})`));
