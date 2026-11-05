@@ -7,6 +7,7 @@ import { Ledger } from "./ledger/ledger.js";
 import { Orchestrator, policyFromEnv } from "./agent/orchestrator.js";
 import { formatUsd, parseUsd } from "./chain/tokens.js";
 import { RunGate, decodeSettlement, hasDeliverable, isTxHash, parsePositiveInt } from "./agent/delivery.js";
+import { RateLimiter, clientIp } from "./agent/ratelimit.js";
 import { renderReceipt } from "./web/receipt.js";
 import { directCall } from "./agent/payDirect.js";
 
@@ -41,6 +42,20 @@ agent.setPayer(
 );
 
 const app = new Hono();
+
+// Per-visitor limits so a public URL cannot drain the LLM key or the test-fund budget. Tunable by env.
+const planLimiter = new RateLimiter(parsePositiveInt("RATE_PLANS_PER_HOUR", process.env.RATE_PLANS_PER_HOUR, 30), 3_600_000);
+const runLimiter = new RateLimiter(parsePositiveInt("RATE_RUNS_PER_HOUR", process.env.RATE_RUNS_PER_HOUR, 10), 3_600_000);
+const limited = (lim: RateLimiter) => async (c: import("hono").Context, next: () => Promise<void>) => {
+  if (c.req.method !== "POST") return next();
+  if (!lim.allow(clientIp((n) => c.req.header(n)))) {
+    return c.json({ error: "Too many requests from your network. Please wait a while and try again." }, 429, { "retry-after": "600" });
+  }
+  return next();
+};
+app.use("/api/plan", limited(planLimiter));
+app.use("/api/approve", limited(runLimiter));
+app.use("/api/run/*", limited(runLimiter));
 const webDir = fileURLToPath(new URL("./web/", import.meta.url));
 const asset = (file: string, type: string) => (c: import("hono").Context) => {
   const p = webDir + file;
