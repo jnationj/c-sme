@@ -1,5 +1,6 @@
 import { serve } from "@hono/node-server";
 import { mkdirSync } from "node:fs";
+import { privateKeyToAccount } from "viem/accounts";
 import { sellerToken } from "./seller/x402.js";
 import { Ledger } from "./ledger/ledger.js";
 import { Orchestrator, policyFromEnv } from "./agent/orchestrator.js";
@@ -58,6 +59,13 @@ console.log("config check:", {
   DEEPSEEK_API_KEY: present(process.env.DEEPSEEK_API_KEY),
   ledger: process.env.LEDGER_PATH ?? "data/ledger.db",
 });
+// The payer's PUBLIC address is safe to log and shows which key is actually in use.
+const payerAddress = payKey ? privateKeyToAccount(payKey).address : undefined;
+console.log("payer address:", payerAddress ?? "(buy CLI account)", "| seller pay-to:", process.env.SELLER_PAY_TO ?? "(unset)");
+if (!testnet && payerAddress && process.env.SELLER_PAY_TO && payerAddress.toLowerCase() !== process.env.SELLER_PAY_TO.toLowerCase()) {
+  console.warn("WARNING: on mainnet the payer key does not control SELLER_PAY_TO. Check AGENT_PRIVATE_KEY and remove PAY_PRIVATE_KEY.");
+}
+if (process.env.PAY_PRIVATE_KEY && !testnet) console.warn("WARNING: PAY_PRIVATE_KEY is set on mainnet and takes priority over AGENT_PRIVATE_KEY. Remove it unless intended.");
 if (!process.env.X402_API_KEY) console.warn("X402_API_KEY is missing: customer payments cannot settle until it is set.");
 if (!process.env.DEEPSEEK_API_KEY && !process.env.ANTHROPIC_API_KEY) console.warn("No LLM key set: reports are computed directly from the data, without an AI writer.");
 
