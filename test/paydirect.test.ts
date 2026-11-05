@@ -18,3 +18,23 @@ describe("directFailureMayHavePaid (an uncertain payment freezes all spending, s
     expect(directFailureMayHavePaid({ paymentSent: true, status: 200 })).toBe(true);
   });
 });
+
+import { noReportMessage } from "../src/agent/orchestrator.js";
+
+describe("noReportMessage", () => {
+  it("explains the sandbox daily allowance and says nothing was charged", () => {
+    const m = noReportMessage([{ status: "failed", note: "sandbox_payer_budget_exhausted: not charged=true" }]);
+    expect(m).toMatch(/daily data allowance/);
+    expect(m).toMatch(/Nothing was charged/);
+  });
+  it("explains an unfunded wallet", () => {
+    expect(noReportMessage([{ status: "failed", note: "verify_payment_failed: Onchain balance is not enough to cover the payment" }])).toMatch(/enough funds/);
+  });
+  it("explains a safety-rule block", () => {
+    expect(noReportMessage([{ status: "blocked" }])).toMatch(/safety rules/);
+  });
+  it("has a plain default", () => {
+    expect(noReportMessage([{ status: "failed", note: "provider_error" }])).toMatch(/No data could be bought/);
+    expect(noReportMessage([])).toMatch(/Nothing was charged/);
+  });
+});

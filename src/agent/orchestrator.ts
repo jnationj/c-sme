@@ -157,7 +157,7 @@ export class Orchestrator {
     const allResults = [...(plan.prior ?? []), ...results];
     const report = results.length
       ? await writeReport(plan.question, allResults)
-      : { text: "No data was bought, so there is no report. See the payment log.", by: "fallback" as const };
+      : { text: noReportMessage(log), by: "fallback" as const };
     ledger.record("report_written", { by: report.by, steps: results.length }, plan.id);
     plan.stage = "done";
     let followUp: { id: string; totalUsd: string; customerUsd: string; steps: Array<{ provider: string; why: string; usd: string }> } | undefined;
@@ -184,4 +184,19 @@ export function policyFromEnv(token: string): PolicyConfig {
     allowedProviders: new Set(["tikhub", "apify", "mrscraper"]),
     allowedTokens: new Set([token]),
   };
+}
+
+/** Explain, in plain words, why no report could be made. Failed calls were never charged. */
+export function noReportMessage(log: Array<{ status: string; note?: string }>): string {
+  const notes = log.map((l) => l.note ?? "").join(" ");
+  if (/sandbox_payer_budget_exhausted/.test(notes)) {
+    return "The test-network demo has used its daily data allowance, so no data could be bought. It resets at midnight UTC. Nothing was charged. Live (mainnet) runs are not limited this way.";
+  }
+  if (/insufficient|not enough to cover/i.test(notes)) {
+    return "The agent's wallet does not have enough funds to buy this data right now. Nothing was charged. Please try again later.";
+  }
+  if (log.some((l) => l.status === "blocked")) {
+    return "The safety rules blocked the purchase (a spending limit or an unapproved source). Nothing was charged.";
+  }
+  return "No data could be bought for this question, so there is no report. Nothing was charged. Please try again or rephrase.";
 }
