@@ -8,13 +8,13 @@
     "node": ">=22.13"
   },
   "scripts": {
-    "dev": "node scripts/build-web.mjs && tsx --env-file-if-exists=.env src/index.ts",
+    "dev": "node --env-file-if-exists=.env scripts/build-web.mjs && tsx --env-file-if-exists=.env src/index.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "wallet:new": "node scripts/generate-wallet.mjs",
     "wallet:buyer": "node scripts/generate-buyer.mjs",
     "pay:test": "tsx --env-file=.env.buyer scripts/pay-test.ts",
-    "build:web": "node scripts/build-web.mjs",
+    "build:web": "node --env-file-if-exists=.env scripts/build-web.mjs",
     "register:8004": "tsx --env-file=.env scripts/register-8004.ts"
   },
   "dependencies": {
@@ -22,16 +22,22 @@
     "@celo/attribution-tags": "^0.5.0",
     "@celo/buy": "^0.8.5",
     "@hono/node-server": "^2.1.6",
+    "@privy-io/react-auth": "3.51.3",
     "@x402/core": "^2.29.0",
     "@x402/evm": "^2.29.0",
     "@x402/extensions": "^2.29.0",
     "@x402/fetch": "^2.29.0",
     "@x402/hono": "^2.29.0",
     "hono": "^4.13.16",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
     "viem": "^2.57.16"
   },
   "devDependencies": {
+    "@solana/kit": "8.6.0",
     "@types/node": "^26.6.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
     "esbuild": "^0.28.2",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",

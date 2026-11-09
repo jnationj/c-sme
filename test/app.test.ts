@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { createApp } from "../src/app.js";
 import { Ledger } from "../src/ledger/ledger.js";
@@ -6,6 +7,7 @@ import { Orchestrator, policyFromEnv } from "../src/agent/orchestrator.js";
 import { BuyError, type BuyResult } from "../src/agent/buyClient.js";
 import { parseUsd } from "../src/chain/tokens.js";
 import type { PlanStep } from "../src/agent/planner.js";
+import type { Capability } from "../src/agent/catalog.js";
 
 const videos = [
   { id: "1", title: "7 hooks to use for AI videos #aitools #fyp", views: 12000, likes: 900, channel: { username: "abc", followers: 5400 }, postPage: "https://www.tiktok.com/@abc/video/1" },
@@ -17,11 +19,30 @@ type PayFn = (a: { url: string; body: unknown; maxAtomic: bigint }) => Promise<B
 const okPay: PayFn = async ({ maxAtomic }) => ({ transaction: TX, paidAtomic: maxAtomic.toString(), token: "USDC", output: videos });
 
 const steps = (): PlanStep[] => [
-  { capabilityId: "c1", title: "Tiktok · Trends", provider: "tikhub", url: "https://example.test/a", body: {}, quoteAtomic: 5000n, why: "Trending hashtags" },
-  { capabilityId: "c2", title: "Tiktok · Scraper", provider: "apify", url: "https://example.test/b", body: {}, quoteAtomic: 9000n, why: "Recent videos" },
+  { capabilityId: "c1", title: "Tiktok · Trends", provider: "tikhub", url: "https://gateway.usebuy.ai/v1/services/c1", body: {}, quoteAtomic: 5000n, why: "Trending hashtags" },
+  { capabilityId: "c2", title: "Tiktok · Scraper", provider: "apify", url: "https://gateway.usebuy.ai/v1/services/c2", body: {}, quoteAtomic: 9000n, why: "Recent videos" },
 ];
 
-function make(o: { testnet?: boolean; adminToken?: string; env?: Record<string, string | undefined>; pay?: PayFn } = {}) {
+function fakeCatalog(planSteps: PlanStep[]) {
+  return new Map(planSteps.map((step) => {
+    const atomic = step.capabilityId === "c1" ? "5000" : "9000";
+    const capability: Capability = {
+      id: step.capabilityId,
+      title: step.title,
+      method: "POST",
+      url: step.url,
+      platform: "TikTok",
+      available: true,
+      provider: step.provider,
+      inputSchema: {},
+      price: { usd: step.capabilityId === "c1" ? "0.005" : "0.009", atomic, tokens: ["USDC", "USAT"] },
+      tiers: [],
+    };
+    return [step.capabilityId, capability];
+  }));
+}
+
+function make(o: { testnet?: boolean; adminToken?: string; env?: Record<string, string | undefined>; pay?: PayFn; planSteps?: PlanStep[]; getCatalog?: () => Promise<Map<string, Capability>> } = {}) {
   delete process.env.DEEPSEEK_API_KEY; // the report must fall back to the computed version, never call out
   delete process.env.ANTHROPIC_API_KEY;
   const testnet = o.testnet ?? true;
@@ -37,7 +58,7 @@ function make(o: { testnet?: boolean; adminToken?: string; env?: Record<string, 
     sandbox: testnet,
     feeAtomic,
     pay: o.pay ?? okPay,
-    planFn: async (q) => (q.includes("nothing") ? [] : steps()),
+    planFn: async (q) => (q.includes("nothing") ? [] : (o.planSteps ?? steps())),
     followUpFn: async () => [],
   });
   const app = createApp({
@@ -51,6 +72,7 @@ function make(o: { testnet?: boolean; adminToken?: string; env?: Record<string, 
     policyCfg,
     env: o.env ?? {},
     webDir: resolve("src/web") + "/",
+    getCatalog: o.getCatalog ?? (async () => fakeCatalog(o.planSteps ?? steps())),
   });
   return { app, ledger, agent };
 }
@@ -62,7 +84,9 @@ const json = async (r: Response) => (await r.json()) as any;
 
 async function planAndRun(app: App, question = "What hooks work for small AI creators on TikTok?") {
   const plan = await json(await post(app, "/api/plan", { question }));
-  const run = await post(app, "/api/approve", { planId: plan.id });
+  const selected = await post(app, "/api/selection", { planId: plan.id, serviceIds: plan.selectedServiceIds });
+  if (!selected.ok) throw new Error("could not select plan sources");
+  const run = await post(app, "/api/approve", { planId: plan.id, serviceIds: plan.selectedServiceIds });
   return { plan, run, body: await json(run) };
 }
 
@@ -88,20 +112,59 @@ describe("pages and config", () => {
 
   it("serves the static assets and a health check", async () => {
     const { app } = make();
-    for (const p of ["/app.js", "/styles.css", "/og.png", "/health"]) expect((await app.request(p)).status, p).toBe(200);
+    for (const p of ["/app.js", "/source-selection.js", "/styles.css", "/og.png", "/health"]) expect((await app.request(p)).status, p).toBe(200);
     expect(await json(await app.request("/health"))).toMatchObject({ ok: true, network: "testnet" });
     expect([200, 404]).toContain((await app.request("/client.js")).status); // the bundle exists only after pnpm build:web
+    const auth = await app.request("/auth.js");
+    expect(auth.status).toBe(existsSync(resolve("web/auth.js")) ? 200 : 404);
+    if (auth.status === 200) expect(auth.headers.get("content-type")).toContain("text/javascript");
+  });
+
+  it("uses supported Try One prompts and gates Pay on server-confirmed selection", async () => {
+    const appJs = await (await make().app.request("/app.js")).text();
+    for (const prompt of [
+      "Find Instagram posts about Ankara fashion and styling.",
+      "What hooks and formats work best for small AI content creators on TikTok?",
+      "Find popular Instagram hashtags related to fashion.",
+      "Which AI video tools are trending on TikTok this week?",
+    ]) {
+      expect(prompt.length).toBeLessThanOrEqual(500);
+      expect(appJs).toContain(`"${prompt}"`);
+    }
+    expect(appJs).toContain("updateSourceSelection(sourceSelection.ids())");
+    expect(appJs).toContain("selectionConfirmation.submit(planId, requestedIds");
+    expect(appJs).toContain("selectionState.busy || !selectionState.valid");
+    expect(appJs).not.toContain("What are Lagos fashion sellers posting on Instagram");
+    expect(appJs).not.toContain("most active ankara tops sellers on Instagram in Lagos");
   });
 
   it("describes the testnet and mainnet setups truthfully", async () => {
-    const t = await json(await make({ env: { SELLER_PAY_TO: "0xabc" } }).app.request("/api/config"));
-    expect(t).toMatchObject({ testnet: true, token: "USDC", freeRunAllowed: true, agentWallet: "0xabc", feeUsd: "0.02", limits: { perCallUsd: "0.05" } });
+    const t = await json(await make({ env: { SELLER_PAY_TO: "0xabc", AGENT_ID: "existing-agent-id", ATTRIBUTION_TAG: "existing_attribution" } }).app.request("/api/config"));
+    expect(t).toMatchObject({ testnet: true, token: "USDC", freeRunAllowed: true, agentWallet: "0xabc", agentId: "existing-agent-id", builderCode: "existing_attribution", feeUsd: "0.02", limits: { perCallUsd: "0.05" } });
     const m = await json(await make({ testnet: false }).app.request("/api/config"));
     expect(m).toMatchObject({ testnet: false, token: "USAT", freeRunAllowed: false, chainId: 42220 });
   });
 });
 
 describe("planning", () => {
+  it("returns structured clarification instead of proposing paid sources for ambiguous questions", async () => {
+    const { app } = make();
+    const originalQuestion = "What tools are trending?";
+    const response = await json(await post(app, "/api/plan", { question: originalQuestion }));
+    expect(response.intent).toMatchObject({
+      originalQuestion,
+      normalizedQuestion: originalQuestion,
+      goal: "trends",
+    });
+    expect(response.intent.platforms).toEqual([]);
+    expect(response.steps).toEqual([]);
+    expect(response.selectedServiceIds).toEqual([]);
+    expect(response.clarification).toContainEqual(expect.objectContaining({
+      code: "ambiguous_platform",
+      requiredInput: "platform",
+    }));
+  });
+
   it("rejects a missing, oversized or malformed question", async () => {
     const { app } = make();
     expect((await post(app, "/api/plan", {})).status).toBe(400);
@@ -111,10 +174,72 @@ describe("planning", () => {
 
   it("quotes data cost plus the fee", async () => {
     const { app } = make();
-    const p = await json(await post(app, "/api/plan", { question: "hooks for AI creators" }));
+    const p = await json(await post(app, "/api/plan", { question: "hooks for AI creators on TikTok" }));
     expect(p).toMatchObject({ dataUsd: "0.014", feeUsd: "0.02", customerUsd: "0.034" });
     expect(p.steps).toHaveLength(2);
     expect(p.steps[0]).toMatchObject({ provider: "tikhub", usd: "0.005" });
+  });
+
+  it("preselects only recommended sources and reprices a user-modified selection", async () => {
+    const proposed = steps().map((step, index) => ({ ...step, recommended: index === 0 }));
+    const { app } = make({ planSteps: proposed });
+    const p = await json(await post(app, "/api/plan", { question: "What hooks work for small AI creators on TikTok?" }));
+    expect(p).toMatchObject({ dataUsd: "0.005", feeUsd: "0.02", customerUsd: "0.025" });
+    expect(p.recommendedServiceIds).toEqual(["c1"]);
+    expect(p.selectedServiceIds).toEqual(["c1"]);
+    expect(p.steps).toHaveLength(2);
+    expect(p.steps[1]).toMatchObject({ recommended: false, selected: false });
+
+    const changed = await json(await post(app, "/api/selection", { planId: p.id, serviceIds: ["c2"] }));
+    expect(changed).toMatchObject({ dataUsd: "0.009", feeUsd: "0.02", customerUsd: "0.029", selectedServiceIds: ["c2"] });
+  });
+
+  it("uses refreshed server catalogue prices instead of the original quote", async () => {
+    const currentCatalog = new Map([...fakeCatalog(steps())].map(([id, capability]) => [
+      id,
+      { ...capability, price: { ...capability.price!, usd: "0.007", atomic: "7000" } },
+    ]));
+    const { app } = make({ getCatalog: async () => currentCatalog });
+    const p = await json(await post(app, "/api/plan", { question: "What hooks work for small AI creators on TikTok?" }));
+    const quote = await json(await post(app, "/api/selection", { planId: p.id, serviceIds: ["c1"] }));
+    expect(quote).toMatchObject({ dataUsd: "0.007", feeUsd: "0.02", customerUsd: "0.027" });
+  });
+
+  it("does not buy before explicit approval and rejects unproposed selections", async () => {
+    let purchases = 0;
+    const { app } = make({ pay: async ({ maxAtomic }) => {
+      purchases++;
+      return { transaction: TX, paidAtomic: maxAtomic.toString(), token: "USDC", output: videos };
+    } });
+    const p = await json(await post(app, "/api/plan", { question: "What hooks work for small AI creators on TikTok?" }));
+    expect((await post(app, "/api/approve", { planId: p.id, serviceIds: p.selectedServiceIds })).status).toBe(400);
+    expect((await post(app, "/api/selection", { planId: p.id, serviceIds: ["not-proposed"] })).status).toBe(400);
+    expect((await post(app, "/api/selection", { planId: p.id, serviceIds: p.selectedServiceIds })).status).toBe(200);
+    expect(purchases).toBe(0);
+    expect((await post(app, "/api/approve", { planId: p.id, serviceIds: [] })).status).toBe(400);
+    expect(purchases).toBe(0);
+    const approved = await post(app, "/api/approve", { planId: p.id, serviceIds: p.selectedServiceIds });
+    expect(approved.status).toBe(200);
+    expect(purchases).toBe(2);
+  });
+
+  it("does not create a report or receipt from a paid but unusable provider response", async () => {
+    const { app } = make({
+      pay: async ({ maxAtomic }) => ({
+        transaction: TX,
+        paidAtomic: maxAtomic.toString(),
+        token: "USDC",
+        output: { success: false, error: "provider unavailable" },
+      }),
+    });
+    const plan = await json(await post(app, "/api/plan", { question: "What hooks work for small AI creators on TikTok?" }));
+    await post(app, "/api/selection", { planId: plan.id, serviceIds: plan.selectedServiceIds });
+    const response = await post(app, "/api/approve", { planId: plan.id, serviceIds: plan.selectedServiceIds });
+    const result = await json(response);
+    expect(response.status).toBe(200);
+    expect(result.receipt).toBe(false);
+    expect(result.report.text).not.toContain("[S1]");
+    expect((await app.request("/r/" + plan.id)).status).toBe(404);
   });
 
   it("charges nothing when no source matches", async () => {
@@ -136,6 +261,15 @@ describe("a full run (operator test-funds path)", () => {
     expect(body.report.text).toContain("## What this data can't tell you");
     expect(body.report.text).toContain("[S1]");
     expect(body.report.by).toBe("fallback");
+    expect(body.report.dashboard.originalQuestion).toBe("What hooks work for small AI creators on TikTok?");
+    expect(body.report.dashboard.quality.recordsAnalyzed).toBe(6);
+    expect(body.report.dashboard.sources[0]).toMatchObject({
+      ref: "S1",
+      provider: "tikhub",
+      serviceId: "c1",
+      purchase: { amountUsd: "0.005", status: "settled", transaction: TX },
+    });
+    expect(body.report.dashboard.sources[0].ref).toBe("S1");
 
     const page = await app.request("/r/" + plan.id);
     expect(page.status).toBe(200);
@@ -147,7 +281,11 @@ describe("a full run (operator test-funds path)", () => {
     expect(html).not.toContain("## What the data shows");
     expect(html).toContain("<b>S1</b>");
 
-    expect(await json(await app.request("/api/receipt/" + plan.id))).toMatchObject({ planId: plan.id, dataUsd: "0.014" });
+    expect(await json(await app.request("/api/receipt/" + plan.id))).toMatchObject({
+      planId: plan.id,
+      dataUsd: "0.014",
+      dashboard: { originalQuestion: "What hooks work for small AI creators on TikTok?" },
+    });
     const prog = await json(await app.request("/api/progress/" + plan.id));
     expect(prog.stage).toBe("done");
     expect(prog.steps.every((s: any) => s.state === "settled")).toBe(true);
@@ -257,6 +395,94 @@ describe("public proof never counts the team's own wallets as customers", () => 
     proof = await json(await app.request("/api/proof"));
     expect(proof).toMatchObject({ paidReports: 2, customers: 1, repeatCustomers: 1, teamTestReports: 2 });
     expect((await json(await app.request("/api/customers")))).toHaveLength(1);
+  });
+});
+
+describe("receipts withhold the question and report until the customer's payment is recorded as settled", () => {
+  // Distinctive strings: if any of them appears in a withheld response, something leaked.
+  const SECRET_Q = "ZQ-QUESTION-8431 which wig sellers in Surulere are growing fastest";
+  const SECRET_R = "ZQ-REPORT-5927 confidential finding about competitor accounts";
+  const SECRET_CALL = "ZQ-PROVIDER-CALL-1764";
+  const SECRET_PAYER = "0x2222222222222222222222222222222222222222";
+  const TXH = "0x" + "c".repeat(64);
+  const LEAKS = [SECRET_Q, SECRET_R, SECRET_CALL, SECRET_PAYER, encodeURIComponent(SECRET_Q)];
+
+  type Seeded = ReturnType<typeof make>;
+  function seed(m: Seeded, id: string, o: { customerAtomic: bigint | null; payment?: "submitted" | "failed" | "settled" }) {
+    m.ledger.saveReport({
+      planId: id,
+      question: SECRET_Q,
+      report: `## What the data shows\n- ${SECRET_R} [S1]`,
+      writtenBy: "fallback",
+      payments: [{ ref: "S1", title: SECRET_CALL, usd: "0.014", status: "settled", tx: TXH }],
+      dataAtomic: 14000n,
+      customerAtomic: o.customerAtomic,
+      payer: o.customerAtomic === null ? null : SECRET_PAYER,
+    });
+    if (o.payment) {
+      m.ledger.createPayment({ idempotencyKey: "in:" + id, taskId: id, direction: "in", provider: "customer", token: "USAT", amount: 34000n, counterparty: null });
+      m.ledger.setStatus("in:" + id, o.payment, o.payment === "settled" ? TXH : undefined);
+    }
+  }
+  const expectNoLeak = (body: string) => {
+    for (const s of LEAKS) expect(body, `leaked: ${s}`).not.toContain(s);
+  };
+
+  for (const status of ["submitted", "failed"] as const) {
+    it(`/api/receipt gives no question or report while the customer payment is ${status}`, async () => {
+      const m = make({ env: {} });
+      seed(m, "p-" + status, { customerAtomic: 34000n, payment: status });
+      const res = await m.app.request("/api/receipt/p-" + status);
+      expect(res.status).toBe(200);
+      const raw = await res.text();
+      expectNoLeak(raw);
+      const body = JSON.parse(raw);
+      expect(body).toMatchObject({ withheld: true, planId: "p-" + status, customerStatus: status, customerUsd: "0.034" });
+      for (const key of ["question", "report", "writtenBy", "purchases", "payer", "dataUsd"]) expect(body, key).not.toHaveProperty(key);
+    });
+
+    it(`/r/ page gives no question or report while the customer payment is ${status}`, async () => {
+      const m = make({ env: {} });
+      seed(m, "h-" + status, { customerAtomic: 34000n, payment: status });
+      const res = await m.app.request("/r/h-" + status);
+      expect(res.status).toBe(200);
+      const html = await res.text();
+      expectNoLeak(html);
+      expect(html).toContain("not settled");
+      expect(html).not.toContain("Run this question again");
+    });
+  }
+
+  it("a paid report with no payment row at all is withheld too", async () => {
+    const m = make({ env: {} });
+    seed(m, "norow", { customerAtomic: 34000n });
+    expectNoLeak(await (await m.app.request("/api/receipt/norow")).text());
+    expectNoLeak(await (await m.app.request("/r/norow")).text());
+  });
+
+  it("a settled customer payment still shows the report on both routes", async () => {
+    const m = make({ env: {} });
+    seed(m, "paid", { customerAtomic: 34000n, payment: "settled" });
+    const api = await json(await m.app.request("/api/receipt/paid"));
+    expect(api).toMatchObject({ planId: "paid", question: SECRET_Q, customerStatus: "settled", customerTx: TXH });
+    expect(api.report).toContain(SECRET_R);
+    expect(api.withheld).toBeUndefined();
+    const html = await (await m.app.request("/r/paid")).text();
+    expect(html).toContain(SECRET_Q);
+    expect(html).toContain(SECRET_R);
+    expect(html).not.toContain("(not settled)");
+  });
+
+  it("an operator/test run (no customer payment) keeps its normal receipt", async () => {
+    const m = make({ env: {} });
+    seed(m, "ops", { customerAtomic: null });
+    const api = await json(await m.app.request("/api/receipt/ops"));
+    expect(api).toMatchObject({ planId: "ops", question: SECRET_Q, customerUsd: null, customerStatus: null });
+    expect(api.report).toContain(SECRET_R);
+    const html = await (await m.app.request("/r/ops")).text();
+    expect(html).toContain(SECRET_Q);
+    expect(html).toContain(SECRET_R);
+    expect(html).toContain("operator test run");
   });
 });
 

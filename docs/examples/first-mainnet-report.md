@@ -4,6 +4,8 @@ Question: *What hooks and formats work best for small AI content creators on Tik
 
 This was run by the project owner on Celo mainnet with the agent wallet, paying the data providers in real USA₮. It is **not** a customer payment. Report written by deepseek from facts computed in code; 3 data purchases, total data cost $0.019.
 
+This is a historical project example, not a live verification. The project-maintained evidence log lists the associated transaction links; this documentation update did not recheck their receipts. S2 is the TikTok Top-content service, which is not topic-filtered. It is a broad sample and may not be relevant to AI creators.
+
 ## What the data shows
 - The trending hashtag list is mostly Halloween and November calendar tags (#halloweekend, #happyhalloween, #november), with a median of 43,506 posts and 72,922,887 views across 10 tags [S1].
 - The top content list is mostly brand ads (#ad appears 3 times, plus #shopifypartner, #ruffles, #fantapartner), and 4 of its 10 hooks are questions [S2].
@@ -13,11 +15,12 @@ This was run by the project owner on Celo mainnet with the agent wallet, paying 
 
 ## What to do this week
 - Do not copy the trending hashtag list. It is Halloween and November tags, not AI creator topics [S1].
-- Test question hooks, since they are the most common hook in both the top content list and the "hooks ai" list [S2][S3].
+- Test question hooks as a hypothesis from the small "hooks ai" sample only; the broad, unfiltered S2 sample cannot establish that question hooks work for this niche [S3].
 - Try the "comment a word to get the link" format used by the top "hooks ai" creator, and post a few videos to compare against your own normal results [S3].
 
 ## What this data can't tell you
 - It cannot say which hooks or formats work best. The "hooks ai" sample is only 10 videos with low median views, so it is too thin to prove anything [S3].
+- S2 is not topic-filtered and may not describe AI creator content.
 - It does not show your own audience, your past videos, or why any post performed well or badly.
 - None of the data is about Nigeria or Nigerian TikTok behaviour, so it cannot guide local timing, language or culture.
 

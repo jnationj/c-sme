@@ -1,0 +1,466 @@
+{
+  "source": "Captured public Buy catalogue response; test-only input schema fixture.",
+  "capabilities": {
+    "monid.instagram.tikhub.api-v1-instagram-v2-general-search": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "queryParams"
+      ],
+      "properties": {
+        "queryParams": {
+          "additionalProperties": false,
+          "type": "object",
+          "properties": {
+            "pagination_token": {
+              "description": "Pagination token",
+              "type": "string"
+            },
+            "keyword": {
+              "description": "Search keyword",
+              "type": "string"
+            }
+          },
+          "required": [
+            "keyword"
+          ]
+        }
+      }
+    },
+    "monid.instagram.tikhub.api-v1-instagram-v2-search-hashtags": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "queryParams"
+      ],
+      "properties": {
+        "queryParams": {
+          "additionalProperties": false,
+          "type": "object",
+          "properties": {
+            "keyword": {
+              "description": "Search keyword",
+              "type": "string"
+            }
+          },
+          "required": [
+            "keyword"
+          ]
+        }
+      }
+    },
+    "monid.instagram.tikhub.api-v1-instagram-v2-fetch-hashtag-posts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "queryParams"
+      ],
+      "properties": {
+        "queryParams": {
+          "additionalProperties": false,
+          "type": "object",
+          "properties": {
+            "pagination_token": {
+              "description": "Pagination token",
+              "type": "string"
+            },
+            "keyword": {
+              "description": "Hashtag keyword (without #)",
+              "type": "string"
+            },
+            "feed_type": {
+              "default": "top",
+              "description": "Feed type: top, recent, or reels",
+              "type": "string"
+            }
+          },
+          "required": [
+            "keyword"
+          ]
+        }
+      }
+    },
+    "monid.tiktok.apify.apidojo-tiktok-scraper": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "body",
+        "maxResults"
+      ],
+      "properties": {
+        "body": {
+          "description": "An actor that gets videos from TikTok.",
+          "type": "object",
+          "properties": {
+            "startUrls": {
+              "type": "array",
+              "description": "Paste the TikTok URLs, and get the results immediately. Video, Photo, User, Search, Tag, Music and Location URLs are supported."
+            },
+            "keywords": {
+              "type": "array",
+              "description": "Search keywords/terms you want to search from TikTok."
+            },
+            "dateRange": {
+              "type": "string",
+              "description": "Date range for search. It uses the standard date filtering of TikTok search.",
+              "enum": [
+                "DEFAULT",
+                "ALL_TIME",
+                "YESTERDAY",
+                "THIS_WEEK",
+                "THIS_MONTH",
+                "LAST_THREE_MONTHS",
+                "LAST_SIX_MONTHS"
+              ]
+            },
+            "location": {
+              "type": "string",
+              "description": "Enables the actor to retrieve the results from that specific region/location, given by an ISO 3166-1 alpha-2 country code.",
+              "enum": [
+                "AF",
+                "AL",
+                "DZ",
+                "AS",
+                "AD",
+                "AO",
+                "AI",
+                "AQ",
+                "AG",
+                "AR",
+                "AM",
+                "AW",
+                "AU",
+                "AT",
+                "AZ",
+                "BS",
+                "BH",
+                "BD",
+                "BB",
+                "BY",
+                "BE",
+                "BZ",
+                "BJ",
+                "BM",
+                "BT",
+                "BO",
+                "BQ",
+                "BA",
+                "BW",
+                "BV",
+                "BR",
+                "IO",
+                "BN",
+                "BG",
+                "BF",
+                "BI",
+                "CV",
+                "KH",
+                "CM",
+                "CA",
+                "KY",
+                "CF",
+                "TD",
+                "CL",
+                "CN",
+                "CX",
+                "CC",
+                "CO",
+                "KM",
+                "CD",
+                "CG",
+                "CK",
+                "CR",
+                "HR",
+                "CU",
+                "CW",
+                "CY",
+                "CZ",
+                "CI",
+                "DK",
+                "DJ",
+                "DM",
+                "DO",
+                "EC",
+                "EG",
+                "SV",
+                "GQ",
+                "ER",
+                "EE",
+                "SZ",
+                "ET",
+                "FK",
+                "FO",
+                "FJ",
+                "FI",
+                "FR",
+                "GF",
+                "PF",
+                "TF",
+                "GA",
+                "GM",
+                "GE",
+                "DE",
+                "GH",
+                "GI",
+                "GR",
+                "GL",
+                "GD",
+                "GP",
+                "GU",
+                "GT",
+                "GG",
+                "GN",
+                "GW",
+                "GY",
+                "HT",
+                "HM",
+                "VA",
+                "HN",
+                "HK",
+                "HU",
+                "IS",
+                "IN",
+                "ID",
+                "IR",
+                "IQ",
+                "IE",
+                "IM",
+                "IL",
+                "IT",
+                "JM",
+                "JP",
+                "JE",
+                "JO",
+                "KZ",
+                "KE",
+                "KI",
+                "KP",
+                "KR",
+                "KW",
+                "KG",
+                "LA",
+                "LV",
+                "LB",
+                "LS",
+                "LR",
+                "LY",
+                "LI",
+                "LT",
+                "LU",
+                "MO",
+                "MG",
+                "MW",
+                "MY",
+                "MV",
+                "ML",
+                "MT",
+                "MH",
+                "MQ",
+                "MR",
+                "MU",
+                "YT",
+                "MX",
+                "FM",
+                "MD",
+                "MC",
+                "MN",
+                "ME",
+                "MS",
+                "MA",
+                "MZ",
+                "MM",
+                "NA",
+                "NR",
+                "NP",
+                "NL",
+                "NC",
+                "NZ",
+                "NI",
+                "NE",
+                "NG",
+                "NU",
+                "NF",
+                "MP",
+                "NO",
+                "OM",
+                "PK",
+                "PW",
+                "PS",
+                "PA",
+                "PG",
+                "PY",
+                "PE",
+                "PH",
+                "PN",
+                "PL",
+                "PT",
+                "PR",
+                "QA",
+                "MK",
+                "RO",
+                "RU",
+                "RW",
+                "RE",
+                "BL",
+                "SH",
+                "KN",
+                "LC",
+                "MF",
+                "PM",
+                "VC",
+                "WS",
+                "SM",
+                "ST",
+                "SA",
+                "SN",
+                "RS",
+                "SC",
+                "SL",
+                "SG",
+                "SX",
+                "SK",
+                "SI",
+                "SB",
+                "SO",
+                "ZA",
+                "GS",
+                "SS",
+                "ES",
+                "LK",
+                "SD",
+                "SR",
+                "SJ",
+                "SE",
+                "CH",
+                "SY",
+                "TW",
+                "TJ",
+                "TZ",
+                "TH",
+                "TL",
+                "TG",
+                "TK",
+                "TO",
+                "TT",
+                "TN",
+                "TR",
+                "TM",
+                "TC",
+                "TV",
+                "UG",
+                "UA",
+                "AE",
+                "GB",
+                "UM",
+                "US",
+                "UY",
+                "UZ",
+                "VU",
+                "VE",
+                "VN",
+                "VG",
+                "VI",
+                "WF",
+                "EH",
+                "YE",
+                "ZM",
+                "ZW",
+                "AX"
+              ]
+            },
+            "sortType": {
+              "type": "string",
+              "description": "Sort type for search. Only works with keyword search — does not apply to startUrls or other input methods.",
+              "enum": [
+                "RELEVANCE",
+                "MOST_LIKED",
+                "DATE_POSTED"
+              ]
+            },
+            "includeSearchKeywords": {
+              "type": "boolean",
+              "description": "If selected, a field will be added to each tweets about the search keyword that was used to find it."
+            }
+          },
+          "additionalProperties": false
+        },
+        "maxResults": {
+          "type": "integer",
+          "enum": [
+            1,
+            5,
+            10
+          ],
+          "description": "Maximum billable results. The gateway enforces this cap in the provider request; fewer returned results are not prorated."
+        }
+      }
+    },
+    "monid.tiktok.tikhub.api-v1-tiktok-ads-get-trends-hashtag-list": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "body",
+        "queryParams"
+      ],
+      "properties": {
+        "body": {
+          "type": "object",
+          "properties": {
+            "country_code": {
+              "default": "US",
+              "description": "国家/地区代码/Country code",
+              "type": "string"
+            },
+            "industry_id": {
+              "description": "一级行业ID(可选)，如10000000000=Education/First-level industry ID (optional)",
+              "type": "integer"
+            },
+            "time_range": {
+              "default": 7,
+              "description": "时间范围(天):7/30/90 /Time range in days",
+              "type": "integer"
+            },
+            "limit": {
+              "default": 20,
+              "description": "每页数量/Items per page",
+              "type": "integer"
+            },
+            "page": {
+              "default": 1,
+              "description": "页码/Page number",
+              "type": "integer"
+            }
+          },
+          "additionalProperties": false
+        },
+        "queryParams": {
+          "additionalProperties": false,
+          "type": "object",
+          "properties": {}
+        }
+      }
+    },
+    "monid.tiktok.tikhub.api-v1-tiktok-analytics-fetch-video-metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "queryParams"
+      ],
+      "properties": {
+        "queryParams": {
+          "additionalProperties": false,
+          "type": "object",
+          "properties": {
+            "item_id": {
+              "description": "Video id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "item_id"
+          ]
+        }
+      }
+    }
+  }
+}

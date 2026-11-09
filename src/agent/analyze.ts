@@ -8,6 +8,12 @@ export interface StepResultLike {
   why: string;
   output: unknown;
   ref?: string;
+  provider?: string;
+  serviceId?: string;
+  paidUsd?: string;
+  purchaseStatus?: string;
+  transaction?: string | null;
+  retrievedAt?: string;
 }
 
 export interface Analysis {
@@ -16,9 +22,15 @@ export interface Analysis {
   why: string;
   itemCount: number;
   topHashtags: Array<{ tag: string; count: number }>;
-  metrics: Array<{ name: string; median: number; max: number; n: number }>;
+  metrics: Array<{ name: string; median: number; max?: number; n: number }>;
   topItems: Array<{ text: string; author?: string; metric?: { name: string; value: number }; url?: string }>;
   hooks?: { total: number; numbered: number; question: number; howTo: number; negative: number; pov: number; beforeAfter: number };
+  provider?: string;
+  serviceId?: string;
+  paidUsd?: string;
+  purchaseStatus?: string;
+  transaction?: string | null;
+  retrievedAt?: string;
   raw?: string; // trimmed raw JSON, only when nothing could be mined
 }
 
@@ -113,6 +125,12 @@ export function hookFlags(text: string) {
 export function analyzeSource(ref: string, r: StepResultLike, maxItems = 60): Analysis {
   const rows = findItems(r.output).slice(0, maxItems);
   const base: Analysis = { ref, source: r.title, why: r.why, itemCount: rows.length, topHashtags: [], metrics: [], topItems: [] };
+  if (r.provider) base.provider = r.provider.slice(0, 80);
+  if (r.serviceId) base.serviceId = r.serviceId.slice(0, 160);
+  if (r.paidUsd) base.paidUsd = r.paidUsd.slice(0, 32);
+  if (r.purchaseStatus) base.purchaseStatus = r.purchaseStatus.slice(0, 32);
+  if (r.transaction !== undefined) base.transaction = r.transaction;
+  if (r.retrievedAt) base.retrievedAt = r.retrievedAt.slice(0, 40);
   if (!rows.length) {
     base.raw = JSON.stringify(r.output ?? null).slice(0, 1500);
     return base;
@@ -177,7 +195,7 @@ export function analyzeSource(ref: string, r: StepResultLike, maxItems = 60): An
       text: (i.text || i.author || "").replace(/\s+/g, " ").slice(0, 140),
       ...(i.author && i.text ? { author: i.author } : {}),
       ...(primary && i.metrics[primary] !== undefined ? { metric: { name: primary, value: i.metrics[primary]! } } : {}),
-      ...(i.url ? { url: i.url } : {}),
+      ...(i.url && i.url.length <= 2048 ? { url: i.url } : {}),
     }));
   if (hooks.total >= 3) base.hooks = hooks;
   if (!base.topItems.length && !base.metrics.length && !base.topHashtags.length) base.raw = JSON.stringify(r.output ?? null).slice(0, 1500);
@@ -193,12 +211,19 @@ const n0 = (n: number) => n.toLocaleString("en-US");
 /** A readable report built only from computed facts: used when no AI key is available or the AI fails. */
 export function renderFromAnalysis(question: string, an: Analysis[]): string {
   const lines: string[] = ["## What the data shows"];
+  const records = an.reduce((total, source) => total + source.itemCount, 0);
+  const citedSources = an.filter((source) => source.itemCount > 0).map((source) => `[${source.ref}]`);
+  lines.push(
+    records
+      ? `- **Answer:** The available data summarizes ${n0(records)} structured records${citedSources.length ? " " + citedSources.join(", ") : ""}. It describes the collected sample; it does not establish that the sample represents all posts.`
+      : `- **Answer:** The returned data did not include structured records that can answer this question${an[0] ? ` [${an[0].ref}]` : ""}.`,
+  );
   let any = false;
   for (const a of an) {
     const bits: string[] = [];
     if (a.topHashtags.length && a.topHashtags[0]!.count > 1) bits.push("most-used hashtags: " + a.topHashtags.slice(0, 5).map((t) => `${t.tag} (${n0(t.count)})`).join(", "));
     const med = a.metrics.find((m) => m.name === "views") ?? a.metrics[0];
-    if (med) bits.push(`typical ${med.name}: ${n0(med.median)} (best ${n0(med.max)}, across ${med.n} items)`);
+    if (med) bits.push(`typical ${med.name}: ${n0(med.median)}${med.max === undefined ? "" : ` (best ${n0(med.max)})`} (across ${med.n} items)`);
     const top = a.topItems[0];
     if (top) bits.push(`top item: "${top.text}"${top.author ? " by " + top.author : ""}${top.metric ? ` (${n0(top.metric.value)} ${top.metric.name})` : ""}`);
     if (bits.length) {

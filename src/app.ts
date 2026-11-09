@@ -2,13 +2,15 @@ import { Hono, type Context } from "hono";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createPaywall } from "./seller/x402.js";
-import type { Ledger } from "./ledger/ledger.js";
+import { startOfUtcDay, type Ledger } from "./ledger/ledger.js";
 import type { Orchestrator } from "./agent/orchestrator.js";
+import { getCatalog, validateCapabilityInput, type Capability, type CapabilityPrice } from "./agent/catalog.js";
+import type { PlanStep } from "./agent/planner.js";
 import type { PolicyConfig } from "./policy/engine.js";
 import { formatUsd } from "./chain/tokens.js";
 import { RunGate, decodeSettlement, hasDeliverable, isSelfPayment, isTxHash, parsePositiveInt, payerFromHeader } from "./agent/delivery.js";
 import { RateLimiter, clientIp } from "./agent/ratelimit.js";
-import { renderReceipt } from "./web/receipt.js";
+import { renderReceipt, type ReceiptView, type WithheldReceiptView } from "./web/receipt.js";
 
 export interface AppDeps {
   testnet: boolean;
@@ -25,6 +27,10 @@ export interface AppDeps {
   webDir?: string;
   /** Path of the bundled browser wallet client. Defaults to web/client.js in the working directory. */
   clientBundle?: string;
+  /** Path of the lazily loaded Privy bundle. Defaults to web/auth.js in the working directory. */
+  authBundle?: string;
+  /** Test hook for the live Buy catalogue. Production always reads https://gateway.usebuy.ai. */
+  getCatalog?: typeof getCatalog;
 }
 
 /** Builds the whole HTTP app. Kept free of side effects (no listening, no env reads) so tests can drive it with fakes. */
@@ -43,6 +49,7 @@ export function createApp(d: AppDeps): Hono {
     return next();
   };
   app.use("/api/plan", limited(planLimiter));
+  app.use("/api/selection", limited(planLimiter));
   app.use("/api/approve", limited(runLimiter));
   app.use("/api/run/*", limited(runLimiter));
 
@@ -72,7 +79,13 @@ export function createApp(d: AppDeps): Hono {
     return c.body(readFileSync(p), 200, { "content-type": "image/png", "cache-control": "public, max-age=3600" });
   });
   app.get("/app.js", asset("app.js", "text/javascript; charset=utf-8"));
+  app.get("/source-selection.js", asset("source-selection.js", "text/javascript; charset=utf-8"));
   app.get("/styles.css", asset("styles.css", "text/css; charset=utf-8"));
+  const authBundle = d.authBundle ?? "web/auth.js";
+  app.get("/auth.js", (c) => {
+    if (!existsSync(authBundle)) return c.text("Privy email sign-in is not configured. Run pnpm build:web with a valid VITE_PRIVY_APP_ID.", 404);
+    return c.body(readFileSync(authBundle), 200, { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-cache" });
+  });
   const bundle = d.clientBundle ?? "web/client.js";
   app.get("/client.js", (c) => {
     if (!existsSync(bundle)) return c.text("client bundle missing: run pnpm build:web", 404);
@@ -145,22 +158,163 @@ export function createApp(d: AppDeps): Hono {
     });
   });
 
-  const describePlan = (p: { id: string; totalAtomic: bigint; customerAtomic: bigint; steps: Array<{ provider: string; why: string; quoteAtomic: bigint }> }) => ({
+  const originalPlanSteps = new Map<string, PlanStep[]>();
+  const confirmedSourceSelections = new Map<string, string[]>();
+  const selectionLocked = new Set<string>();
+  const selectionUpdating = new Set<string>();
+  const describePlan = (p: {
+    id: string;
+    question: string;
+    totalAtomic: bigint;
+    customerAtomic: bigint;
+    steps: PlanStep[];
+    limitations: string[];
+    intent: { originalQuestion: string; normalizedQuestion: string; goal: string; platforms: string[]; topics: string[] };
+    clarification?: Array<{ code: string; prompt: string; requiredInput?: string }>;
+  }, options = p.steps) => ({
     id: p.id,
+    question: p.question,
+    intent: {
+      originalQuestion: p.intent.originalQuestion,
+      normalizedQuestion: p.intent.normalizedQuestion,
+      goal: p.intent.goal,
+      platforms: p.intent.platforms,
+      topics: p.intent.topics,
+    },
+    ...(p.clarification ? { clarification: p.clarification } : {}),
     dataUsd: formatUsd(p.totalAtomic),
-    feeUsd: formatUsd(feeAtomic),
+    feeUsd: formatUsd(p.steps.length ? feeAtomic : 0n),
     customerUsd: formatUsd(p.customerAtomic),
-    steps: p.steps.map((s) => ({ provider: s.provider, why: s.why, usd: formatUsd(s.quoteAtomic) })),
+    recommendedServiceIds: options.filter((s) => s.recommended !== false).map((s) => s.capabilityId),
+    selectedServiceIds: p.steps.map((s) => s.capabilityId),
+    limitations: p.limitations,
+    steps: options.map((s) => ({
+      capabilityId: s.capabilityId,
+      title: s.title,
+      provider: s.provider,
+      why: s.why,
+      usd: formatUsd(s.quoteAtomic),
+      recommended: s.recommended !== false,
+      selected: p.steps.some((selected) => selected.capabilityId === s.capabilityId),
+      ...(s.platform ? { platform: s.platform } : {}),
+      ...(s.resultLimit !== undefined ? { resultLimit: s.resultLimit } : {}),
+    })),
   });
+
+  async function applySourceSelection(planId: string, serviceIds: unknown) {
+    const plan = agent.getPlan(planId);
+    if (!plan || plan.status !== "proposed") throw new Error("unknown or already used plan");
+    if (selectionLocked.has(planId)) throw new Error("this plan has already been submitted for payment; start a new plan to change sources");
+    if (selectionUpdating.has(planId)) throw new Error("a source selection is already being checked for this plan");
+    selectionUpdating.add(planId);
+    try {
+      const original = originalPlanSteps.get(planId);
+      if (!original) throw new Error("the original proposed sources are unavailable");
+      if (!Array.isArray(serviceIds) || serviceIds.length > original.length || serviceIds.some((id) => typeof id !== "string")) {
+        throw new Error("serviceIds must be an array of proposed service IDs");
+      }
+      const originalIds = original.map((step) => step.capabilityId);
+      if (new Set(originalIds).size !== originalIds.length) throw new Error("this plan contains duplicate service IDs and cannot be selected safely");
+      const requestedIds = serviceIds as string[];
+      if (new Set(requestedIds).size !== requestedIds.length || requestedIds.some((id) => !originalIds.includes(id))) {
+        throw new Error("selection contains a duplicate or unauthorized service ID");
+      }
+
+      const catalog = await (d.getCatalog ?? getCatalog)(true);
+      if (selectionLocked.has(planId) || plan.status !== "proposed") {
+        throw new Error("this plan has already been submitted for payment; start a new plan to change sources");
+      }
+      const available: PlanStep[] = [];
+      for (const step of original) {
+        const cap = catalog.get(step.capabilityId);
+        const body = step.body && typeof step.body === "object" && !Array.isArray(step.body)
+          ? step.body as Record<string, unknown>
+          : undefined;
+        const tier = body?.maxResults === undefined
+          ? undefined
+          : cap?.tiers.find((price) => price.maxResults === body.maxResults && (!price.tokens || price.tokens.includes(token)));
+        const price = body?.maxResults !== undefined
+          ? tier
+          : cap?.price && (!cap.price.tokens || cap.price.tokens.includes(token))
+            ? cap.price
+            : undefined;
+        const gatewayUrl = (() => {
+          try {
+            return new URL(step.url).origin === "https://gateway.usebuy.ai";
+          } catch {
+            return false;
+          }
+        })();
+        if (
+          !cap?.available ||
+          cap.id !== step.capabilityId ||
+          cap.url !== step.url ||
+          cap.method.toUpperCase() !== "POST" ||
+          !gatewayUrl ||
+          !policyCfg.allowedProviders.has(step.provider.toLowerCase()) ||
+          (cap.provider && cap.provider.toLowerCase() !== step.provider.toLowerCase()) ||
+          !policyCfg.allowedTokens.has(token) ||
+          !price ||
+          !/^\d+$/.test(price.atomic) ||
+          BigInt(price.atomic) <= 0n
+        ) {
+          if (requestedIds.includes(step.capabilityId)) throw new Error(`selected service is no longer available at its approved Buy price: ${step.capabilityId}`);
+          continue;
+        }
+        const schemaErrors = validateCapabilityInput(cap, step.body);
+        if (schemaErrors.length) {
+          if (requestedIds.includes(step.capabilityId)) {
+            throw new Error(`selected request no longer matches the Buy catalogue for ${step.capabilityId}: ${schemaErrors.join("; ")}`);
+          }
+          continue;
+        }
+        available.push({ ...step, quoteAtomic: BigInt(price.atomic) });
+      }
+
+      const selected = available.filter((step) => requestedIds.includes(step.capabilityId));
+      const totalAtomic = selected.reduce((total, step) => total + step.quoteAtomic, 0n);
+      if (policyCfg.killSwitch && selected.length) throw new Error("spending is currently disabled by the safety policy");
+      if (ledger.spentForTask(planId) + totalAtomic > policyCfg.perTaskCap) throw new Error("selected sources exceed the per-report spending limit");
+      if (ledger.spentSince(startOfUtcDay()) + totalAtomic > policyCfg.dailyCap) throw new Error("selected sources exceed the daily spending limit");
+
+      plan.steps = selected;
+      plan.totalAtomic = totalAtomic;
+      plan.customerAtomic = selected.length ? totalAtomic + feeAtomic : 0n;
+      plan.progress = selected.map(() => ({ state: "pending" as const, tx: null }));
+      originalPlanSteps.set(planId, available);
+      return describePlan(plan, available);
+    } finally {
+      selectionUpdating.delete(planId);
+    }
+  }
 
   app.post("/api/plan", async (c) => {
     const body = await c.req.json<{ question?: string }>().catch(() => ({}) as { question?: string });
     const question = body.question;
     if (!question || typeof question !== "string" || question.length > 500) return c.json({ error: "question required (max 500 chars)" }, 400);
     try {
-      return c.json(describePlan(await agent.propose(question)));
+      const plan = await agent.propose(question);
+      const options = plan.steps.map((step) => ({ ...step }));
+      originalPlanSteps.set(plan.id, options);
+      plan.steps = options.filter((step) => step.recommended !== false);
+      plan.totalAtomic = plan.steps.reduce((total, step) => total + step.quoteAtomic, 0n);
+      plan.customerAtomic = plan.steps.length ? plan.totalAtomic + feeAtomic : 0n;
+      plan.progress = plan.steps.map(() => ({ state: "pending" as const, tx: null }));
+      return c.json(describePlan(plan, options));
     } catch (e) {
       return c.json({ error: (e as Error).message }, 502);
+    }
+  });
+
+  app.post("/api/selection", async (c) => {
+    const body = await c.req.json<{ planId?: string; serviceIds?: unknown }>().catch(() => ({} as { planId?: string; serviceIds?: unknown }));
+    try {
+      const planId = body.planId ?? "";
+      const selected = await applySourceSelection(planId, body.serviceIds);
+      confirmedSourceSelections.set(planId, selected.selectedServiceIds);
+      return c.json(selected);
+    } catch (e) {
+      return c.json({ error: (e as Error).message }, 400);
     }
   });
 
@@ -178,6 +332,7 @@ export function createApp(d: AppDeps): Hono {
       dataAtomic: ledger.spentForTask(result.planId),
       customerAtomic: paid ? plan.customerAtomic : null,
       payer,
+      dashboard: result.report.dashboard,
     });
   }
 
@@ -186,9 +341,23 @@ export function createApp(d: AppDeps): Hono {
     if (!testnet && (!adminToken || c.req.header("x-admin-token") !== adminToken)) {
       return c.json({ error: "forbidden: on mainnet the customer must pay via /api/run" }, 403);
     }
-    const body = await c.req.json<{ planId?: string }>().catch(() => ({}) as { planId?: string });
+    const body = await c.req.json<{ planId?: string; serviceIds?: unknown }>().catch(() => ({} as { planId?: string; serviceIds?: unknown }));
     try {
-      const result = await agent.approve(body.planId ?? "");
+      const planId = body.planId ?? "";
+      const serviceIds = confirmedSourceSelections.get(planId);
+      if (!serviceIds) throw new Error("review and select data sources before approving a purchase");
+      if (body.serviceIds !== undefined && (
+        !Array.isArray(body.serviceIds) ||
+        body.serviceIds.length !== serviceIds.length ||
+        body.serviceIds.some((id) => typeof id !== "string" || !serviceIds.includes(id))
+      )) {
+        throw new Error("the approved selection does not match the reviewed sources");
+      }
+      const selected = await applySourceSelection(planId, serviceIds);
+      confirmedSourceSelections.set(planId, selected.selectedServiceIds);
+      if (!selected.selectedServiceIds.length) throw new Error("select at least one data source before approving a purchase");
+      selectionLocked.add(planId);
+      const result = await agent.approve(planId);
       persist(result, null, false);
       return c.json({ ...result, receipt: hasDeliverable(result.payments) });
     } catch (e) {
@@ -197,14 +366,36 @@ export function createApp(d: AppDeps): Hono {
   });
 
   const explorerTx = testnet ? "https://celo-sepolia.blockscout.com/tx/" : "https://celoscan.io/tx/";
-  function receiptFor(planId: string) {
+  // Both receipt routes (HTML and JSON) read from here, so they cannot disagree about what may be shown.
+  // A customer payment (customerAtomic !== null) must be recorded as "settled" before the question or report leave the
+  // server. Operator/test runs (customerAtomic === null) have no customer payment and keep their normal receipt.
+  // "settled" is the ledger's status (facilitator-reported success plus a well-formed hash); it is not checked on-chain here.
+  function receiptFor(planId: string): ReceiptView | WithheldReceiptView | undefined {
     const r = ledger.getReport(planId);
     if (!r) return undefined;
     const inRow = ledger.getPayment("in:" + planId);
+    if (r.customerAtomic !== null && inRow?.status !== "settled") {
+      const status = inRow?.status ?? null;
+      return {
+        withheld: true,
+        planId: r.planId,
+        network: networkLabel,
+        explorerTx,
+        createdAt: r.createdAt,
+        customerUsd: formatUsd(r.customerAtomic),
+        customerStatus: status,
+        customerTx: inRow?.txHash ?? null,
+        message:
+          status === "failed"
+            ? "Your payment was not settled, so this report is not available."
+            : "Your payment has not been confirmed as settled yet, so the report is not shown. Please check again shortly.",
+      };
+    }
     return {
       planId: r.planId,
       question: r.question,
       report: r.report,
+      dashboard: r.dashboard,
       writtenBy: r.writtenBy,
       network: networkLabel,
       explorerTx,
@@ -265,6 +456,21 @@ export function createApp(d: AppDeps): Hono {
       const id = c.req.path.split("/").pop() ?? "";
       const p = agent.getPlan(id);
       if (!p || p.status !== "proposed" || !p.steps.length) return c.json({ error: "unknown or already used plan" }, 404);
+      const selectedIds = confirmedSourceSelections.get(id);
+      if (!selectedIds || selectedIds.length === 0) return c.json({ error: "review and select data sources before approving a purchase" }, 400);
+      if (selectionLocked.has(id)) {
+        const planIds = p.steps.map((step) => step.capabilityId);
+        if (planIds.length !== selectedIds.length || planIds.some((serviceId) => !selectedIds.includes(serviceId))) {
+          return c.json({ error: "the reviewed sources no longer match this payment; start a new plan" }, 409);
+        }
+      } else {
+        try {
+          await applySourceSelection(id, selectedIds);
+        } catch (e) {
+          return c.json({ error: (e as Error).message }, 409);
+        }
+      }
+      if (!p.steps.length) return c.json({ error: "no selected source is available to purchase" }, 409);
       // A wallet cannot pay itself: the facilitator refuses it after our agent has already bought data. Refuse up front.
       if (isSelfPayment(c.req.header("payment-signature") ?? c.req.header("x-payment"), payTo)) {
         return c.json({ error: "The paying wallet and the receiving wallet are the same address, so this payment cannot settle. Please pay from a different wallet. Nothing was charged." }, 400);
@@ -276,6 +482,7 @@ export function createApp(d: AppDeps): Hono {
       if (!gate.tryEnter(ledger.countIncomingSince("failed", 3_600_000) + ledger.countIncoming("submitted", 5 * 60_000))) {
         return c.json({ error: "temporarily unavailable, please try again later" }, 503);
       }
+      selectionLocked.add(id);
       try {
         await next();
         const key = `in:${id}`;

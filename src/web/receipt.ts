@@ -1,7 +1,12 @@
+import type { ReportDashboard } from "../agent/report-dashboard.js";
+
 export interface ReceiptView {
+  /** Present (false) so a view can be told apart from a WithheldReceiptView. */
+  withheld?: false;
   planId: string;
   question: string;
   report: string;
+  dashboard?: ReportDashboard;
   writtenBy: string;
   network: string;
   explorerTx: string; // e.g. https://celoscan.io/tx/
@@ -60,12 +65,24 @@ export function renderReportHtml(text: string): string {
   return out.join("\n");
 }
 
-/** Public, shareable receipt. The plan id is an unguessable UUID; only the report and payment facts are shown. */
-export function renderReceipt(v: ReceiptView): string {
-  const rows = v.purchases
-    .map((p) => `<tr><td>${p.ref ? "<b>" + esc(p.ref) + "</b> " : ""}${esc(p.title)}</td><td>$${esc(p.usd)}</td><td class="${p.status === "settled" ? "ok" : "warn"}">${esc(p.status)}</td><td>${txLink(v.explorerTx, p.tx)}</td></tr>`)
-    .join("");
-  return `<!doctype html>
+/**
+ * What a receipt may show while the customer's payment is not confirmed as settled: payment facts only.
+ * It carries no question, no report, no data-purchase list and no payer address.
+ */
+export interface WithheldReceiptView {
+  withheld: true;
+  planId: string;
+  network: string;
+  explorerTx: string;
+  createdAt: number;
+  customerUsd: string;
+  /** "submitted" (still being confirmed), "failed", or null when no payment row exists. Never "settled". */
+  customerStatus: string | null;
+  customerTx: string | null;
+  message: string;
+}
+
+const RECEIPT_DOC_START = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>cPilot receipt</title>
 <style>
@@ -77,7 +94,31 @@ main{max-width:760px;margin:0 auto;padding:20px 16px 60px}h1{font-size:1.4rem;ma
 .mute{color:var(--mute)}.ok{color:var(--acc)}.warn{color:var(--warn)}a{color:var(--acc)}
 table{width:100%;border-collapse:collapse;font-size:.92rem}td,th{padding:7px 4px;border-bottom:1px solid var(--line);text-align:left}
 pre{white-space:pre-wrap;word-break:break-word;font:inherit;margin:0}.rep h4{margin:14px 0 4px;font-size:1rem}.rep p{margin:6px 0}.rep ul,.rep ol{margin:6px 0 6px 1.2em;padding:0}.rep li{margin:5px 0}.rep code{background:var(--bg);padding:1px 5px;border-radius:5px}.badge{display:inline-block;padding:2px 10px;border-radius:99px;border:1px solid var(--line);font-size:.8rem;color:var(--mute)}
-</style></head><body><main>
+</style></head><body><main>`;
+
+/** Receipt for a customer payment that is not settled: says so, and shows nothing the customer has not paid for. */
+function renderWithheldReceipt(v: WithheldReceiptView): string {
+  return `${RECEIPT_DOC_START}
+<h1>cPilot receipt</h1>
+<p class="mute"><span class="badge">${esc(v.network)}</span> ${esc(new Date(v.createdAt).toUTCString())}</p>
+<div class="card"><strong>Payment not settled</strong>
+<p>${esc(v.message)}</p>
+<table><tr><th>Amount</th><th>Status</th><th>Transaction</th></tr>
+<tr><td>$${esc(v.customerUsd)}</td><td class="warn">${esc(v.customerStatus ?? "no payment recorded")} (not settled)</td><td>${txLink(v.explorerTx, v.customerTx)}</td></tr></table></div>
+<p class="mute"><a href="/">Ask your own question</a></p>
+</main></body></html>`;
+}
+
+/**
+ * Public, shareable receipt. The plan id is an unguessable UUID.
+ * A customer payment that is not settled gets the withheld page: no question, no report.
+ */
+export function renderReceipt(v: ReceiptView | WithheldReceiptView): string {
+  if (v.withheld) return renderWithheldReceipt(v);
+  const rows = v.purchases
+    .map((p) => `<tr><td>${p.ref ? "<b>" + esc(p.ref) + "</b> " : ""}${esc(p.title)}</td><td>$${esc(p.usd)}</td><td class="${p.status === "settled" ? "ok" : "warn"}">${esc(p.status)}</td><td>${txLink(v.explorerTx, p.tx)}</td></tr>`)
+    .join("");
+  return `${RECEIPT_DOC_START}
 <h1>cPilot receipt</h1>
 <p class="mute"><span class="badge">${esc(v.network)}</span> ${esc(new Date(v.createdAt).toUTCString())}</p>
 <div class="card"><strong>Question</strong><p>${esc(v.question)}</p></div>
