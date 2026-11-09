@@ -1,4 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
+import type { ReportDashboard } from "../agent/report-dashboard.js";
 
 /**
  * Append-only audit ledger plus a payments table. Every economic action must be reconstructable:
@@ -58,7 +59,8 @@ export class Ledger {
         data_atomic TEXT NOT NULL,
         customer_atomic TEXT,
         payer TEXT,
-        created_at INTEGER NOT NULL
+        created_at INTEGER NOT NULL,
+        dashboard TEXT
       );
       CREATE INDEX IF NOT EXISTS reports_payer ON reports(payer);
       CREATE TABLE IF NOT EXISTS raw_outputs (
@@ -70,6 +72,10 @@ export class Ledger {
         PRIMARY KEY (plan_id, idx)
       );
     `);
+    const reportColumns = this.db.prepare("PRAGMA table_info(reports)").all() as Array<{ name: string }>;
+    if (!reportColumns.some((column) => column.name === "dashboard")) {
+      this.db.exec("ALTER TABLE reports ADD COLUMN dashboard TEXT");
+    }
   }
 
   record(kind: string, data: unknown, taskId?: string, now = Date.now()): void {
@@ -120,9 +126,9 @@ export class Ledger {
   saveReport(r: SavedReport, now = Date.now()): void {
     this.db
       .prepare(
-        "INSERT OR REPLACE INTO reports (plan_id, question, report, written_by, payments, data_atomic, customer_atomic, payer, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT OR REPLACE INTO reports (plan_id, question, report, written_by, payments, data_atomic, customer_atomic, payer, created_at, dashboard) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       )
-      .run(r.planId, r.question, r.report, r.writtenBy, JSON.stringify(r.payments), r.dataAtomic.toString(), r.customerAtomic?.toString() ?? null, r.payer?.toLowerCase() ?? null, now);
+      .run(r.planId, r.question, r.report, r.writtenBy, JSON.stringify(r.payments), r.dataAtomic.toString(), r.customerAtomic?.toString() ?? null, r.payer?.toLowerCase() ?? null, now, r.dashboard ? JSON.stringify(r.dashboard) : null);
     this.record("report.saved", { planId: r.planId, payer: r.payer }, r.planId, now);
   }
 
@@ -231,6 +237,7 @@ export interface SavedReport {
   dataAtomic: bigint;
   customerAtomic: bigint | null;
   payer: string | null;
+  dashboard?: ReportDashboard;
 }
 
 function rowToReport(r: Record<string, unknown>): SavedReport & { createdAt: number } {
@@ -243,6 +250,7 @@ function rowToReport(r: Record<string, unknown>): SavedReport & { createdAt: num
     dataAtomic: BigInt(r.data_atomic as string),
     customerAtomic: r.customer_atomic == null ? null : BigInt(r.customer_atomic as string),
     payer: (r.payer as string | null) ?? null,
+    ...(typeof r.dashboard === "string" ? { dashboard: JSON.parse(r.dashboard) as ReportDashboard } : {}),
     createdAt: r.created_at as number,
   };
 }

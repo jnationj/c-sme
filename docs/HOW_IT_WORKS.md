@@ -1,71 +1,36 @@
-# How cPilot works, and why not just ask a chatbot
+# How cPilot works
 
-cPilot answers one kind of question: **"what is working on Instagram or TikTok for people like me?"** It is built for Nigerian online sellers and creators. It is not a general assistant. This page explains exactly how a report is made, so you can judge it on evidence.
+cPilot helps Nigerian online sellers and creators research public Instagram and TikTok content. It is a focused research tool, not a general assistant. It does not access private accounts, private messages, or a seller's actual sales.
 
-## From question to report, step by step
+## From question to cited report
 
-1. **You ask** in plain language. Example: "What hooks and formats work best for small AI content creators on TikTok?"
-2. **The planner picks sources.** Plain code (not the AI) reads the question, pulls out the topic words, and chooses a handful of data sources from the live buy catalog (`gateway.usebuy.ai/v1/catalog`). It only uses sources that are live and priced right now. Typical picks: TikTok trending hashtags, TikTok top-performing content, a TikTok video search for your keywords, an Instagram account search, recent posts from the accounts it found.
-3. **You see the exact price** of every source and the total (data cost + a small service fee) before anything is paid. Nothing is spent yet.
-4. **You approve and pay** from your own wallet. Your payment is authorised but only settles after the report is delivered. If the agent cannot buy any data, you are not charged.
-5. **A rules engine approves each purchase.** Before the agent pays a provider it checks hard limits: $0.05 per call, $0.25 per report, $1 per day, only approved providers and tokens, no duplicate payments, a kill switch, and a stop if an earlier payment is uncertain. The AI model cannot override these checks.
-6. **The agent buys the data** by paying each provider per call over x402 on Celo. Each purchase is a real on-chain payment with a transaction hash.
-7. **The report is written from the bought data only.** An AI model (DeepSeek, with a plain-list fallback) is instructed to use only the data provided, to avoid inventing numbers or creators, to suggest one concrete next action, and to **say what the data cannot answer**.
-8. **You get a receipt page** for the report listing every data call with its transaction link, and the ledger records each payment.
+1. **Ask.** The user writes a question in plain language.
+2. **Discover.** A deterministic planner extracts the supported intent and proposes services using the live Buy catalogue at `https://gateway.usebuy.ai/v1/catalog`. No provider is called during planning.
+3. **Review and select.** The user sees the proposed data sources and prices and can change the selection. The browser submits the selected service IDs to `/api/selection`. The server refreshes the catalogue and validates each service's availability, Buy gateway URL, method, provider, token, input schema, and current price. The server response is canonical; the browser uses its selected sources and quote.
+4. **Approve.** The user must explicitly approve the server-confirmed quote in their wallet. A changed or unconfirmed selection cannot be paid. Empty selections are not purchasable.
+5. **Retrieve.** The backend sends external data-purchase requests only through `https://gateway.usebuy.ai`. It does not call TikTok, Instagram, Apify, TikHub, or another data provider directly. Provider names in the catalogue describe the service, not an authorization to bypass Buy.
+6. **Analyze.** Code computes supported counts, medians, hashtags, and other structured facts from usable purchased responses. Failed, unavailable, malformed, empty, or otherwise unusable responses are not described as successful research purchases. If no usable purchased data is returned, cPilot does not produce a research report.
+7. **Report.** The report cites its purchased sources and describes relevant limitations. A service's presence in a plan is not evidence that it returned data.
 
-If a data source fails, the failed call is recorded as "failed, not charged" and the run continues with the rest. A report is only delivered if at least one purchase settled.
+## Important limits on findings
 
-## Where the data comes from (read this before relying on a report)
+- TikTok's Top-content catalogue service does not accept a topic filter. It is a broad sample. Its results must not be described as topic-matched or used to imply that a finding applies to the user's niche.
+- The providers are third parties. cPilot has not verified how they collect their data or whether their collection methods comply with each platform's terms.
+- The service sees only the public content returned by the purchased services. It cannot see private account data, private messages, actual business sales, or why a post performed well.
+- Coverage and fields vary by service and response. Missing fields are not evidence of zero activity. Geography and date ranges are limited to what the selected service actually supports.
 
-- **Sources:** third-party data providers, mainly **TikHub** and **Apify**, sold through the buy catalog (`gateway.usebuy.ai`). We pay them per call over x402.
-- **Not official APIs.** The data does not come from TikTok's or Instagram's own APIs, and we do not use any customer's TikTok or Instagram login or account.
-- **We have not verified how these providers collect their data.** Providers like these may gather public pages, which can raise questions under each platform's terms. We cannot vouch for their methods, so we describe the result only as "data about public content from third-party providers".
-- **What we do with it:** read patterns (counts, medians, top posts) and cite each one. We keep the raw response of each purchase on our server so a report can be re-checked. Reports may quote public posts and account names that appear in the data.
+## Payment status and security limitation
 
-## What the agent can and cannot see
+The user sees the selected-source quote and must approve in a wallet. Provider purchases are made through Buy; a provider failure is not counted as a successful data result. If the provider-payment outcome is uncertain, the agent stops further spending rather than retrying automatically.
 
-| It can | It cannot |
-|---|---|
-| Recent public TikTok videos for a keyword, trending hashtags, top-performing ads/content | Your own account analytics or private data |
-| Public Instagram accounts and posts matching a query, recent posts of those accounts | Prices that sellers keep in DMs ("DM for price") |
-| Show you engagement signals that exist in the purchased data | Prove why a post performed well |
+Incoming customer settlement has a known verification gap. The application currently accepts facilitator-reported success plus a transaction-hash-shaped value as settled; it does **not** independently verify a successful Celo receipt, the expected USA₮ contract, payer, recipient, amount, or matching USA₮ `Transfer` event. A local ledger status or receipt link is not independent proof of those facts. The project therefore cannot promise that payment is independently verified or guaranteed to occur only after a report is delivered. An unresolved payment must not be retried.
 
-Known limits today: TikTok trend data is US-weighted, some provider calls fail intermittently, and reports are a few short bullets, not a long analysis.
+The project-maintained [evidence log](../EVIDENCE.md) records a team-wallet test and earlier payment issues. It does not document independent customer activity. Historical entries and linked transactions were not re-verified as part of this documentation update.
 
-## Why not just ask ChatGPT or Claude?
+## Where data comes from
 
-An honest comparison.
+The purchased inputs are third-party services listed by Buy (including services identified in the catalogue as TikHub or Apify). They are not TikTok's or Instagram's official APIs. cPilot does not use a customer's social-media login. The project has not independently assessed provider collection practices.
 
-**Where a general chatbot is better.** It holds a conversation, remembers you, writes in your voice, handles any topic, and some can search the web inside the same chat. If you want brainstorming or editing, use one.
+## Validation and non-claims
 
-**What cPilot does differently.**
-
-| | General chatbot | cPilot |
-|---|---|---|
-| Where facts come from | Training data, or web pages it can open | Data about public TikTok and Instagram content, bought per question from third-party providers |
-| Evidence | Usually none you can check | Each report lists every data call with its on-chain transaction |
-| Cost | Monthly subscription | A few cents per question, price shown first |
-| Pays only on success | No | Yes: your payment settles only after the report is delivered |
-| Admits gaps | Sometimes | Every report ends with what the data cannot answer |
-| Spending control | Not applicable | Hard per-call, per-report and daily limits enforced in code |
-
-**What we do not claim.** We are not smarter than a chatbot, not conversational, and we do not remember you. Our value is narrow: current platform data, bought on demand, with receipts and a price you agree to first. If that is not what you need, a chatbot is the better tool. We would rather say that than oversell.
-
-## Why not do this by hand?
-
-You can, and for a one-off question it is free. This is what we know about the free options (not re-checked against each platform's current rules, so verify before relying on it):
-
-| Free option | What it gives you | Limits |
-|---|---|---|
-| TikTok Creative Center (public website) | Trending hashtags, top-performing ads, top creators, with region filters | Fixed views only, no custom questions. Check whether your country is listed. |
-| TikTok and Instagram search, hashtag and Explore pages | The actual posts with their likes and views | You scroll and note things yourself. Instagram needs a login and shows only a slice. |
-| Your own account's Insights (professional accounts) | Your own audience and post performance | Your own data only, never a competitor's |
-
-**What costs you time by hand:** reading dozens of posts, counting which hooks repeat, comparing several accounts, and keeping track of where each claim came from. **What cPilot adds:** it does the reading and counting in about a minute, cites every claim to a purchased source, and tells you what the data cannot answer.
-
-**What it does not add:** access to anything you could not see yourself in the apps. If you have a free hour and want to learn the platform, doing it by hand is a good way to start. cPilot is for people who would rather have the answer and the receipts.
-
-## Where the money goes
-- **Customer pays** data cost + $0.02 service fee (USA₮ on Celo mainnet, USDC on the Sepolia test network), through Celo's x402 facilitator. The fee covers report writing, hosting and payment settlement.
-- **The agent pays providers** per call from its own wallet over x402 for services in the buy catalog.
-- Receipts and the "Live proof" panel show real transaction links. In test mode the numbers come from the Sepolia test network and are labelled as such.
+Local test and typecheck results are recorded in the root [README](../README.md). Those checks do not prove live catalogue availability, provider data retrieval, successful on-chain settlement, deployment health, or independent customer use. cPilot does not claim to be more capable than a general chatbot; its purpose is to purchase selected public-content data, summarize what was returned, and show its sources and limitations.

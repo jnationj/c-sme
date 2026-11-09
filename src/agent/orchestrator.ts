@@ -2,14 +2,30 @@ import { randomUUID } from "node:crypto";
 import { Ledger, startOfUtcDay } from "../ledger/ledger.js";
 import { evaluateSpend, type PolicyConfig } from "../policy/engine.js";
 import { formatUsd, parseUsd } from "../chain/tokens.js";
-import { followUpSteps, planSteps, type PlanStep } from "./planner.js";
+import {
+  clarifyResearchIntent,
+  extractResearchIntent,
+  followUpSteps,
+  planSteps,
+  researchLimitations,
+  researchQuestion,
+  type PlanStep,
+  type ResearchClarification,
+  type ResearchIntent,
+} from "./planner.js";
 import { buyCall, BuyError, type BuyResult } from "./buyClient.js";
 import { writeReport, type StepResult } from "./report.js";
+import { buildReportDashboard } from "./report-dashboard.js";
+import { isUsableResearchOutput } from "./research-output.js";
 
 export interface Plan {
   id: string;
   question: string;
+  originalQuestion: string;
+  intent: ResearchIntent;
+  clarification?: ResearchClarification[];
   steps: PlanStep[];
+  limitations: string[];
   totalAtomic: bigint;
   /** What the customer pays us: data cost plus our fee. */
   customerAtomic: bigint;
@@ -52,11 +68,22 @@ export class Orchestrator {
   }
 
   async propose(question: string): Promise<Plan> {
-    const steps = await (this.o.planFn ?? planSteps)(question);
+    const research = researchQuestion(question);
+    const intent = extractResearchIntent(question);
+    const clarification = clarifyResearchIntent(intent);
+    const steps = clarification.length
+      ? []
+      : this.o.planFn
+        ? await this.o.planFn(research)
+        : await planSteps(research, 5, undefined, this.o.token);
     const plan: Plan = {
       id: randomUUID(),
-      question,
+      question: research,
+      originalQuestion: question,
+      intent,
+      ...(clarification.length ? { clarification } : {}),
       steps,
+      limitations: researchLimitations(research),
       totalAtomic: steps.reduce((a, s) => a + s.quoteAtomic, 0n),
       customerAtomic: 0n,
       status: "proposed",
@@ -67,7 +94,7 @@ export class Orchestrator {
     this.plans.set(plan.id, plan);
     this.o.ledger.record(
       "plan_proposed",
-      { question, steps: steps.map((s) => ({ id: s.capabilityId, usd: formatUsd(s.quoteAtomic) })) },
+      { question: research, steps: steps.map((s) => ({ id: s.capabilityId, usd: formatUsd(s.quoteAtomic) })) },
       plan.id,
     );
     return plan;
@@ -87,7 +114,7 @@ export class Orchestrator {
     const results: StepResult[] = [];
     const bought: StepResult[] = [];
     let refN = plan.prior?.length ?? 0; // citation labels S1, S2, ... continue across stages
-    const log: Array<{ title: string; usd: string; status: string; tx: string | null; note?: string; ref?: string }> = [];
+    const log: Array<{ title: string; usd: string; status: string; tx: string | null; note?: string; ref?: string; usableData?: boolean }> = [];
     for (const [i, s] of plan.steps.entries()) {
       const key = `${plan.id}:${i}`;
       const decision = evaluateSpend(
@@ -133,16 +160,44 @@ export class Orchestrator {
           ledger.record("price_above_quote", { quoted: s.quoteAtomic.toString(), paid: r.paidAtomic }, plan.id);
         }
         plan.progress[i] = { state: "settled", tx: r.transaction };
+        if (!isUsableResearchOutput(r.output)) {
+          ledger.saveRaw(plan.id, i, s.title, r.output);
+          ledger.record("provider_output_rejected", { step: s.capabilityId, reason: "response was empty, malformed, or an explicit provider error" }, plan.id);
+          log.push({
+            title: s.title,
+            usd: formatUsd(r.paidAtomic ? BigInt(r.paidAtomic) : s.quoteAtomic),
+            status: "settled",
+            tx: r.transaction,
+            note: "Payment settled, but the service returned no usable research data.",
+            usableData: false,
+          });
+          continue;
+        }
         const ref = "S" + ++refN;
+        const paidUsd = formatUsd(r.paidAtomic ? BigInt(r.paidAtomic) : s.quoteAtomic);
+        const retrievedAt = new Date().toISOString();
         ledger.saveRaw(plan.id, i, s.title, r.output); // keep what was bought so reports can be re-analysed without paying again
-        results.push({ title: s.title, why: s.why, output: r.output, ref });
-        bought.push({ title: s.title, why: s.why, output: r.output, ref });
+        const sourceResult: StepResult = {
+          title: s.title,
+          why: s.why,
+          output: r.output,
+          ref,
+          provider: s.provider,
+          serviceId: s.capabilityId,
+          paidUsd,
+          purchaseStatus: "settled",
+          transaction: r.transaction,
+          retrievedAt,
+        };
+        results.push(sourceResult);
+        bought.push(sourceResult);
         log.push({
           ref,
           title: s.title,
-          usd: formatUsd(r.paidAtomic ? BigInt(r.paidAtomic) : s.quoteAtomic),
+          usd: paidUsd,
           status: "settled",
           tx: r.transaction,
+          usableData: true,
         });
       } catch (e) {
         const maybe = e instanceof BuyError ? e.paymentMayHaveHappened : true;
@@ -163,15 +218,19 @@ export class Orchestrator {
     plan.stage = "writing";
     const allResults = [...(plan.prior ?? []), ...results];
     const report = results.length
-      ? await writeReport(plan.question, allResults)
-      : { text: noReportMessage(log), by: "fallback" as const };
+      ? await writeReport(plan.question, allResults, plan.originalQuestion)
+      : {
+          text: noReportMessage(log),
+          by: "fallback" as const,
+          dashboard: buildReportDashboard(plan.originalQuestion, noReportMessage(log), []),
+        };
     ledger.record("report_written", { by: report.by, steps: results.length }, plan.id);
     plan.stage = "done";
     let followUp: { id: string; totalUsd: string; customerUsd: string; steps: Array<{ provider: string; why: string; usd: string }> } | undefined;
     if (!plan.prior && results.length) {
       const fs = await (this.o.followUpFn ?? followUpSteps)(bought);
       if (fs.length) {
-        const child: Plan = { id: randomUUID(), question: plan.question, steps: fs, totalAtomic: fs.reduce((a, s) => a + s.quoteAtomic, 0n), customerAtomic: 0n, status: "proposed", prior: allResults, stage: "queued", progress: fs.map(() => ({ state: "pending" as const, tx: null })) };
+        const child: Plan = { id: randomUUID(), question: plan.question, originalQuestion: plan.originalQuestion, intent: plan.intent, steps: fs, limitations: plan.limitations, totalAtomic: fs.reduce((a, s) => a + s.quoteAtomic, 0n), customerAtomic: 0n, status: "proposed", prior: allResults, stage: "queued", progress: fs.map(() => ({ state: "pending" as const, tx: null })) };
         child.customerAtomic = child.totalAtomic + this.o.feeAtomic;
         this.plans.set(child.id, child);
         ledger.record("followup_proposed", { parent: plan.id, steps: fs.length }, child.id);
@@ -196,6 +255,9 @@ export function policyFromEnv(token: string): PolicyConfig {
 /** Explain, in plain words, why no report could be made. Failed calls were never charged. */
 export function noReportMessage(log: Array<{ status: string; note?: string }>): string {
   const notes = log.map((l) => l.note ?? "").join(" ");
+  if (log.some((l) => l.status === "settled" && l.note?.includes("no usable research data"))) {
+    return "A data purchase settled, but the service returned no usable research data. No research report was produced.";
+  }
   if (/sandbox_payer_budget_exhausted/.test(notes)) {
     return "The test-network demo has used its daily data allowance, so no data could be bought. It resets at midnight UTC. Nothing was charged. Live (mainnet) runs are not limited this way.";
   }

@@ -2,6 +2,7 @@
 
 export interface PaymentLogEntry {
   status: string;
+  usableData?: boolean;
 }
 
 /**
@@ -9,7 +10,7 @@ export interface PaymentLogEntry {
  * non-2xx status so the x402 middleware does NOT settle the customer's payment (it settles only on success).
  */
 export function hasDeliverable(payments: PaymentLogEntry[]): boolean {
-  return payments.some((p) => p.status === "settled");
+  return payments.some((p) => p.status === "settled" && p.usableData !== false);
 }
 
 export interface Settlement {

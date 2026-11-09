@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { decodeSettlement, hasDeliverable } from "../src/agent/delivery.js";
 import { Ledger } from "../src/ledger/ledger.js";
+import { buildReportDashboard } from "../src/agent/report-dashboard.js";
+import type { Analysis } from "../src/agent/analyze.js";
 
 const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64");
 
@@ -70,11 +72,14 @@ describe("Ledger reports and customer stats", () => {
 
   it("saves and reads back a report", () => {
     const l = new Ledger();
-    l.saveReport(rep("p1", "0xABCDEF0000000000000000000000000000000001", 39000n));
+    const analysis: Analysis = { ref: "S1", source: "Videos", why: "", itemCount: 1, topHashtags: [], metrics: [], topItems: [] };
+    const dashboard = buildReportDashboard("q", "## What the data shows\n- **Answer:** one record [S1]", [analysis]);
+    l.saveReport({ ...rep("p1", "0xABCDEF0000000000000000000000000000000001", 39000n), dashboard });
     const r = l.getReport("p1");
     expect(r?.question).toBe("q");
     expect(r?.dataAtomic).toBe(19000n);
     expect(r?.payer).toBe("0xabcdef0000000000000000000000000000000001"); // stored lowercased
+    expect(r?.dashboard).toEqual(dashboard);
     expect(l.getReport("missing")).toBeUndefined();
   });
 

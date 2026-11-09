@@ -1,22 +1,73 @@
-# secrets: never commit
+# Environment files (keep the checked-in template)
 .env
 .env.*
 !.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Private keys, certificates, and keystores
 *.key
 *.pem
+*.crt
+*.cer
+*.p12
+*.pfx
+*.jks
+*.keystore
 
-# runtime state
-node_modules/
+# Local databases and SQLite state
 data/
+*.db
 *.sqlite
+*.sqlite3
+*.sqlite-*
+*.sqlite3-*
+*.db-journal
+*.db-wal
+*.db-shm
 *.sqlite-journal
-.buy/
-dist/
-coverage/
+*.sqlite-wal
+*.sqlite-shm
 
-# local agent/IDE settings and working chat logs
+# Dependencies, runtime state, caches, logs, and temporary files
+node_modules/
+.buy/
+.cache/
+.pnpm-store/
+.turbo/
+.vite/
+.next/
+.pytest_cache/
+.eslintcache
+*.log
+*.log.*
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+*.pid
+*.seed
+*.tmp
+*.temp
+*.swp
+*.swo
+*.bak
+*.tsbuildinfo
+tmp/
+temp/
+
+# Generated build output
+dist/
+build/
+coverage/
+/web/
+
+# Local agent/IDE settings and working chat logs
 .claude/settings.local.json
 co-pilot.txt
 claude.txt
 lastresponseChatgpt.md
-/web/
+
+# OS-generated files
+.DS_Store
+Thumbs.db

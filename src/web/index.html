@@ -5,20 +5,20 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="dark light">
 <title>cPilot: market research for Nigerian online sellers</title>
-<meta name="description" content="Ask what's working on Instagram and TikTok. An agent buys the data, shows every price first, and you pay only if the report is delivered. Built on Celo.">
+<meta name="description" content="Research public Instagram and TikTok content. Review the sources and price, then decide whether to approve a paid run. Built on Celo.">
 <meta name="theme-color" content="#0b1210">
 <link rel="canonical" href="__PUBLIC_URL__/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="cPilot">
-<meta property="og:title" content="cPilot: know your market, pay only for the answer">
-<meta property="og:description" content="Market research for Nigerian online sellers and creators. An agent buys data about public Instagram and TikTok content, shows every price first, and you pay only if the report is delivered.">
+<meta property="og:title" content="cPilot: research public social content">
+<meta property="og:description" content="Market research for Nigerian online sellers and creators. Review proposed data sources and price before deciding whether to approve a paid run.">
 <meta property="og:url" content="__PUBLIC_URL__/">
 <meta property="og:image" content="__PUBLIC_URL__/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="cPilot: know your market, pay only for the answer">
-<meta name="twitter:description" content="An agent buys Instagram and TikTok data for you, shows every price first, and you pay only if the report is delivered.">
+<meta name="twitter:title" content="cPilot: research public social content">
+<meta name="twitter:description" content="Review proposed Instagram and TikTok data sources and price before deciding whether to approve a paid run.">
 <meta name="twitter:image" content="__PUBLIC_URL__/og.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b1210'/%3E%3Cpath d='M6 22c6 0 6-12 12-12h8M6 10c6 0 6 12 12 12h8' fill='none' stroke='%2334e0a1' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/styles.css">
@@ -39,16 +39,88 @@
   </div>
 </header>
 
+<dialog id="signin" class="signin" aria-labelledby="siTitle">
+  <div class="si-head">
+    <h2 id="siTitle">Connect to pay</h2>
+    <button id="siClose" class="btn btn-link btn-sm" type="button" aria-label="Close">Close</button>
+  </div>
+  <div id="siChoose" class="si-body">
+    <p class="muted small">Sign in with email to create or reconnect your Privy wallet. Signing in does not charge you; approve each payment separately.</p>
+    <form id="siEmailForm" class="si-form" novalidate>
+      <label for="siEmail" class="small">Email address</label>
+      <input id="siEmail" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" maxlength="254">
+      <button id="siEmailGo" class="btn btn-primary" type="submit">Email me a code</button>
+    </form>
+    <button id="siWallet" class="btn btn-ghost" type="button">Connect MetaMask or another browser wallet</button>
+    <p id="siOff" class="muted small" hidden>Email wallet sign-in isn't configured yet. You can connect MetaMask or another browser wallet.</p>
+  </div>
+  <form id="siCodeForm" class="si-body" hidden novalidate>
+    <p class="small">Enter the 6-digit code sent to <b id="siSentTo"></b>.</p>
+    <label for="siCode" class="small">Verification code</label>
+    <input id="siCode" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="6" placeholder="123456">
+    <button id="siCodeGo" class="btn btn-primary" type="submit">Verify and continue</button>
+    <button id="siCodeBack" class="btn btn-link" type="button">Use a different email</button>
+  </form>
+  <div id="siWorking" class="si-body" hidden>
+    <p id="siWorkingText" class="small" role="status">Working…</p>
+    <button id="siCancel" class="btn btn-link" type="button">Cancel</button>
+  </div>
+  <div id="siAccount" class="si-body" hidden>
+    <dl class="kv">
+      <div><dt>Signed in as</dt><dd id="siLabel">…</dd></div>
+      <div><dt>Email wallet</dt><dd id="siAddr" class="mono"></dd></div>
+      <div><dt>Payment network</dt><dd id="siNetwork"></dd></div>
+    </dl>
+    <p class="muted small">Privy manages this embedded wallet; cPilot never receives its private key. Account recovery is controlled by Privy and your sign-in method. Use Privy's export screen if you want to make a key backup, and keep it secure.</p>
+    <button id="siUse" class="btn btn-primary" type="button" hidden>Use this email wallet</button>
+    <button id="siCopy" class="btn btn-ghost" type="button">Copy wallet address</button>
+    <button id="siExport" class="btn btn-ghost" type="button">Export my key</button>
+    <p id="siExportInstruction" class="muted small" role="status" hidden>Privy's private export screen is open. This app never sees your key.</p>
+  </div>
+  <div id="walletBox" class="wallet-box" aria-labelledby="wbTitle">
+    <div class="row between">
+      <b id="wbTitle">Your wallet</b>
+      <button id="wbStop" class="btn btn-link btn-sm" type="button" hidden>Stop using this wallet here</button>
+    </div>
+    <dl id="wbDetails" class="kv" hidden>
+      <div><dt>Account</dt><dd id="wbAddr" class="mono"></dd></div>
+      <div><dt>Network</dt><dd id="wbNet"></dd></div>
+      <div><dt>Balance</dt><dd><span id="wbBal"></span> <button id="wbRefresh" class="copy" type="button">refresh</button></dd></div>
+    </dl>
+    <p id="wbMsg" class="wb-msg small" role="status" aria-live="polite" hidden></p>
+    <button id="wbSwitch" class="btn btn-ghost btn-sm" type="button" hidden></button>
+    <div id="wbHelp" class="wb-help" hidden>
+      <b>Open cPilot in your wallet app</b>
+      <p class="small">To pay, open this page in the browser built into your wallet app, then connect. Ordinary Chrome or Safari can't connect to wallet apps yet. If you opened this from Instagram or TikTok, copy the link first.</p>
+      <ol class="small">
+        <li>Copy the link.</li>
+        <li>Open your wallet app.</li>
+        <li>Paste the link into the wallet's browser.</li>
+      </ol>
+      <button id="wbCopy" class="btn btn-ghost btn-sm" type="button">Copy page link</button>
+      <p class="small muted">On a computer, install a wallet extension such as MetaMask.</p>
+    </div>
+    <p id="wbClock" class="muted small" hidden></p>
+  </div>
+  <button id="siSignOut" class="btn btn-link" type="button" hidden>Sign out of this wallet</button>
+  <p id="siError" class="wb-msg small error" role="alert" hidden></p>
+  <button id="siRetry" class="btn btn-ghost" type="button" hidden>Try again</button>
+</dialog>
+
 <main id="main">
   <section class="hero">
     <p class="eyebrow">For Nigerian online sellers and creators</p>
-    <h1>Know your market.<br><span class="grad">Pay only for the answer.</span></h1>
-    <p class="lede">Ask what your competitors post, what is trending, which hooks work. An agent buys data about public Instagram and TikTok content from third-party providers, shows every price first, and you pay only if the report is delivered.</p>
+    <h1>Know what works on Instagram and TikTok before you spend on it.</h1>
+    <p class="lede">Ask a real question about your niche. cPilot buys current data about public posts and accounts, counts what it finds, and writes you a cited report. You see the proposed price first and decide whether to approve a paid run in your wallet.</p>
+    <div class="hero-actions">
+      <a class="btn btn-primary" href="#askTitle">Ask your first question</a>
+      <a class="btn btn-ghost" href="#how">See how it works</a>
+    </div>
     <ul class="trust" aria-label="Guarantees">
-      <li><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5l4 4 8-9" /></svg>Exact price before you pay</li>
-      <li><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5l4 4 8-9" /></svg>Charged only if delivered</li>
+      <li><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5l4 4 8-9" /></svg>Price shown before approval</li>
+      <li><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5l4 4 8-9" /></svg>You approve each paid run</li>
       <li><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5l4 4 8-9" /></svg>Spending limits enforced in code</li>
-      <li><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5l4 4 8-9" /></svg><span id="chipPay">Pay in USDC on Celo</span></li>
+      <li><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5l4 4 8-9" /></svg><span id="chipPay">Pay in a stablecoin on Celo</span></li>
     </ul>
   </section>
 
@@ -90,18 +162,36 @@
           <h2 id="planTitle" tabindex="-1">Your plan</h2>
           <span id="planNote" class="chip"></span>
         </div>
+        <p class="muted small">Your research request</p>
         <p id="planQ" class="quote"></p>
-        <ul id="planList" class="sources"></ul>
+        <h3 class="sub">Recommended data purchases</h3>
+        <ul id="recommendedList" class="sources"></ul>
+        <h3 id="alternativesTitle" class="sub" hidden>Other relevant services</h3>
+        <ul id="otherList" class="sources"></ul>
+        <ul id="planLimits" class="limits-list" hidden></ul>
+        <p id="selectionStatus" class="muted small" role="status" aria-live="polite"></p>
         <div class="total-box">
           <div class="line"><span>Data from providers</span><b id="dataUsd"></b></div>
           <div class="line"><span>Service fee</span><b id="feeUsd"></b></div>
           <div class="line grand"><span>You pay</span><b id="totalUsd"></b></div>
         </div>
         <p class="fee-note muted small">The service fee covers writing the report, hosting, and payment settlement. The rest is the data itself, priced by each provider.</p>
-        <p class="guarantee"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2l7 3v5c0 4-3 7-7 8-4-1-7-4-7-8V5l7-3z"/><path d="M7 10l2 2 4-4"/></svg>Nothing is charged until your wallet approves. You pay only if the report is delivered.</p>
+        <p id="payLine" class="pay-line" hidden></p>
+
+        <div id="balConfirm" class="alert" role="group" aria-labelledby="bcTitle" hidden>
+          <b id="bcTitle" tabindex="-1">We couldn't check your balance</b>
+          <p id="bcText" class="small"></p>
+          <div class="row actions">
+            <button id="bcGo" class="btn btn-primary btn-sm" type="button">Pay anyway</button>
+            <button id="bcRetry" class="btn btn-ghost btn-sm" type="button">Check again</button>
+            <button id="bcCancel" class="btn btn-link btn-sm" type="button">Cancel</button>
+          </div>
+        </div>
+
+        <p class="guarantee"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2l7 3v5c0 4-3 7-7 8-4-1-7-4-7-8V5l7-3z"/><path d="M7 10l2 2 4-4"/></svg>Your wallet approval is required before a paid run. Incoming settlement is not independently verified on-chain.</p>
         <div class="row actions">
-          <button id="pay" class="btn btn-primary" type="button">Pay with my wallet</button>
-          <button id="free" class="btn btn-ghost" type="button" hidden>Run with test funds</button>
+          <button id="pay" class="btn btn-primary" type="button">Approve and pay</button>
+          <button id="free" class="btn btn-ghost" type="button" hidden>Approve and run with test funds</button>
           <button id="cancel" class="btn btn-link" type="button">Start over</button>
         </div>
       </section>
@@ -128,9 +218,13 @@
           </div>
         </div>
         <p id="repMeta" class="muted small"></p>
-        <article id="repBody" class="report"></article>
+        <div id="reportDashboard" class="report-dashboard" hidden></div>
         <h3 class="sub">What was bought</h3>
         <ul id="repPays" class="pays"></ul>
+        <details id="writtenReport" class="written-report">
+          <summary>View the original written report</summary>
+          <article id="repBody" class="report"></article>
+        </details>
         <div id="followCard" class="follow" hidden>
           <div>
             <b>Go deeper</b>
@@ -190,21 +284,52 @@
           <li>Hard caps: <span id="lPer"></span> per call, <span id="lTask"></span> per report, <span id="lDay"></span> per day.</li>
           <li>Only approved providers and tokens.</li>
           <li>Never pays twice. Stops if a payment is uncertain.</li>
-          <li><b>You pay only if the report is delivered.</b> Your payment is authorised first but settles only after the report exists. If the data can't be bought, nothing is taken from you.</li>
+          <li><b>Settlement limitation.</b> The app relies on the facilitator's response and does not independently verify the incoming payment against a Celo receipt and token transfer event.</li>
           <li>Every payment is logged with its transaction link.</li>
         </ul>
       </section>
     </aside>
   </div>
+
+    <section class="audience" aria-labelledby="audienceTitle">
+    <h2 id="audienceTitle">Who it's for</h2>
+    <div class="audience-cards">
+      <article class="audience-card">
+        <h3>Online sellers</h3>
+        <p>See what posts and accounts get attention in your niche, from fashion and beauty to food and gadgets, before you plan your next drop.</p>
+      </article>
+      <article class="audience-card">
+        <h3>Creators</h3>
+        <p>Find which hooks, formats and hashtags are working for accounts like yours, without scrolling through hundreds of videos.</p>
+      </article>
+      <article class="audience-card">
+        <h3>Small businesses</h3>
+        <p>Check who is active in your market and how they post, so you spend on ads with a clearer picture.</p>
+      </article>
+    </div>
+    <p class="audience-disclaimer">cPilot reads public posts and accounts only. It does not see anyone's sales or private data.</p>
+  </section>
+
+  <section id="how" class="how" aria-labelledby="howTitle">
+    <h2 id="howTitle">How it works</h2>
+    <ol class="how-steps">
+      <li><h3>1 · Ask</h3><p>Type a real question about your market, or start from an example.</p></li>
+      <li><h3>2 · Review</h3><p>See which data it will buy, what each source adds, and the exact price.</p></li>
+      <li><h3>3 · Pay</h3><p>Review the quote and approve a paid run in your wallet. Check the settlement status shown in the receipt.</p></li>
+      <li><h3>4 · Read</h3><p>Get a cited report with the limits stated and a receipt for every purchase.</p></li>
+    </ol>
+  </section>
 </main>
 
 <footer class="foot">
   <span>cPilot, built for the Agents on Open Rails hackathon on Celo.</span>
   <span class="muted">Reports describe public content and say what the data cannot answer. Verify before you rely on them.</span>
   <span class="muted">Data comes from third-party providers (TikHub and Apify), not from TikTok or Instagram directly. We have not verified how those providers collect it.</span>
+  <span class="muted">Incoming settlement is not independently verified on-chain. See the project documentation before relying on payment status.</span>
 </footer>
 
 <script src="/client.js"></script>
+<script src="/source-selection.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>

@@ -104,9 +104,10 @@ describe("renderFromAnalysis (the no-AI report)", () => {
 
 describe("looksValid (AI output must follow the format and only cite real sources)", () => {
   const an = analyzeAll([{ title: "T", why: "w", output: videos }]);
-  const good = "## What the data shows\n- Fact [S1]\n## What to do this week\n- Act\n## What this data can't tell you\n- Gaps";
+  const good = "## What the data shows\n- **Answer:** Fact [S1]\n## What to do this week\n- Act\n## What this data can't tell you\n- Gaps";
   it("accepts a well-formed, correctly cited report", () => expect(looksValid(good, an)).toBe(true));
   it("rejects a missing section", () => expect(looksValid("## What the data shows\n- x [S1]", an)).toBe(false));
+  it("rejects a report without a direct answer", () => expect(looksValid(good.replace("**Answer:** ", ""), an)).toBe(false));
   it("rejects citations to sources that do not exist", () => expect(looksValid(good.replace("[S1]", "[S9]"), an)).toBe(false));
   it("rejects a report with no citations", () => expect(looksValid(good.replace(" [S1]", ""), an)).toBe(false));
 });
