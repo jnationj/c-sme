@@ -4,6 +4,11 @@ cPilot helps Nigerian online sellers and creators research public Instagram and 
 
 Data is sold by third-party providers through [Buy](https://usebuy.ai), not fetched from TikTok's or Instagram's own APIs. cPilot reads public posts and accounts only. It cannot see private account data or actual business sales, and the project has not verified how providers collect their data. See [How cPilot works](docs/HOW_IT_WORKS.md).
 
+## 🚀 Live Demo
+
+- **Live Application:** [https://c-sme-production.up.railway.app](https://c-sme-production.up.railway.app/)
+- **Video Demonstration:** [https://youtu.be/TlbKZkzEPqc](https://youtu.be/TlbKZkzEPqc) (unlisted)
+
 ## Status and evidence
 
 The codebase includes the planner, live Buy catalogue integration, server-confirmed source selection, wallet flows, analysis/reporting, and Celo x402 payment paths. The current project evidence documents a project-owner/team-wallet test and provider-purchase records. It does **not** document independent customer activity. See [EVIDENCE.md](EVIDENCE.md); this project-maintained log is not a substitute for independently checking chain receipts.

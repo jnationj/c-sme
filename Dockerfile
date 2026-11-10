@@ -9,6 +9,7 @@ RUN pnpm install --frozen-lockfile --prod=false
 COPY tsconfig.json ./
 COPY src ./src
 COPY scripts ./scripts
+ARG VITE_PRIVY_APP_ID
 RUN node scripts/build-web.mjs
 # The ledger database lives here: mount a persistent volume at /app/data on the host.
 RUN mkdir -p /app/data
